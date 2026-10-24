@@ -77,6 +77,8 @@ describe('DocumentsService', () => {
         textStorageKey: null,
         pageCount: null,
         failureReason: null,
+        documentType: null,
+        extractedData: null,
       });
       expect(storage.save).toHaveBeenCalledWith(
         `${document.id}.pdf`,
@@ -145,6 +147,8 @@ describe('DocumentsService', () => {
         textStorageKey: null,
         pageCount: null,
         failureReason: null,
+        documentType: null,
+        extractedData: null,
       });
       repository.findById.mockResolvedValue(existing);
 

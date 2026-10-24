@@ -1,14 +1,20 @@
 import { Logger } from '@nestjs/common';
+import { InvalidLlmResponseError } from '../ai/errors/invalid-llm-response.error.js';
+import { LlmQuotaExceededError } from '../ai/errors/llm-quota-exceeded.error.js';
+import { DocumentAnalyzerService } from '../ai/extraction/document-analyzer.service.js';
+import { DocumentType } from '../ai/schemas/document-type.js';
 import { DocumentStatus } from '../documents/domain/document-status.enum.js';
 import { DocumentEntity } from '../documents/domain/document.entity.js';
 import { DocumentRepository } from '../documents/repositories/document.repository.js';
 import { StorageProvider } from '../storage/storage.provider.js';
 import { DocumentProcessingService } from './document-processing.service.js';
+import { DataExtractionFailedError } from './errors/data-extraction-failed.error.js';
 import { UnreadableDocumentError } from './errors/unreadable-document.error.js';
 import { TextExtractor } from './extraction/text-extractor.js';
 import { TextExtractorRegistry } from './extraction/text-extractor.registry.js';
 
 const DOCUMENT_ID = 'doc-1';
+const INVOICE_DATA = { invoiceNumber: 'FE-1', total: 150 };
 
 function buildDocument(
   overrides: Partial<DocumentEntity> = {},
@@ -24,6 +30,8 @@ function buildDocument(
     textStorageKey: null,
     pageCount: null,
     failureReason: null,
+    documentType: null,
+    extractedData: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -41,6 +49,7 @@ describe('DocumentProcessingService', () => {
   };
   let extractor: { extract: ReturnType<typeof vi.fn> };
   let registry: { forMimeType: ReturnType<typeof vi.fn> };
+  let analyzer: { analyze: ReturnType<typeof vi.fn> };
   let service: DocumentProcessingService;
 
   beforeEach(() => {
@@ -64,15 +73,22 @@ describe('DocumentProcessingService', () => {
           : null,
       ),
     };
+    analyzer = {
+      analyze: vi.fn().mockResolvedValue({
+        documentType: DocumentType.Invoice,
+        extractedData: INVOICE_DATA,
+      }),
+    };
     service = new DocumentProcessingService(
       repository as unknown as DocumentRepository,
       storage as unknown as StorageProvider,
       registry as unknown as TextExtractorRegistry,
+      analyzer as unknown as DocumentAnalyzerService,
     );
   });
 
   describe('process', () => {
-    it('marks the document processing, stores the text and marks it ready', async () => {
+    it('marks the document processing, stores the text and analysis, and marks it ready', async () => {
       await service.process(DOCUMENT_ID);
 
       expect(repository.update).toHaveBeenNthCalledWith(1, DOCUMENT_ID, {
@@ -83,39 +99,79 @@ describe('DocumentProcessingService', () => {
         `${DOCUMENT_ID}.txt`,
         Buffer.from('Total 150', 'utf8'),
       );
+      expect(analyzer.analyze).toHaveBeenCalledWith(DOCUMENT_ID, {
+        kind: 'text',
+        text: 'Total 150',
+      });
       expect(repository.update).toHaveBeenNthCalledWith(2, DOCUMENT_ID, {
         status: DocumentStatus.Ready,
         textStorageKey: `${DOCUMENT_ID}.txt`,
         pageCount: 2,
         failureReason: null,
+        documentType: DocumentType.Invoice,
+        extractedData: INVOICE_DATA,
       });
     });
 
-    it('marks an image ready without extracting text', async () => {
+    it('sends an image to the analyzer without extracting text', async () => {
+      const image = Buffer.from('png-bytes');
+      storage.read.mockResolvedValue(image);
       repository.findById.mockResolvedValue(
         buildDocument({ mimeType: 'image/png', storageKey: 'doc-1.png' }),
       );
 
       await service.process(DOCUMENT_ID);
 
-      expect(storage.read).not.toHaveBeenCalled();
+      expect(storage.save).not.toHaveBeenCalled();
+      expect(analyzer.analyze).toHaveBeenCalledWith(DOCUMENT_ID, {
+        kind: 'image',
+        mimeType: 'image/png',
+        content: image,
+      });
       expect(repository.update).toHaveBeenLastCalledWith(DOCUMENT_ID, {
         status: DocumentStatus.Ready,
         textStorageKey: null,
         pageCount: null,
         failureReason: null,
+        documentType: DocumentType.Invoice,
+        extractedData: INVOICE_DATA,
       });
     });
 
-    it('treats a PDF without text as ready, not as an error', async () => {
-      extractor.extract.mockResolvedValue({ text: '', pageCount: 1 });
+    it('marks a PDF without text ready without calling the LLM', async () => {
+      extractor.extract.mockResolvedValue({ text: '  \n ', pageCount: 1 });
 
       await service.process(DOCUMENT_ID);
 
+      expect(analyzer.analyze).not.toHaveBeenCalled();
       expect(repository.update).toHaveBeenLastCalledWith(
         DOCUMENT_ID,
-        expect.objectContaining({ status: DocumentStatus.Ready, pageCount: 1 }),
+        expect.objectContaining({
+          status: DocumentStatus.Ready,
+          pageCount: 1,
+          documentType: null,
+          extractedData: null,
+        }),
       );
+    });
+
+    it.each([
+      ['an invalid LLM response', new InvalidLlmResponseError('invoice')],
+      ['an exhausted LLM quota', new LlmQuotaExceededError()],
+    ])('turns %s into a permanent error', async (_case, failure) => {
+      analyzer.analyze.mockRejectedValue(failure);
+
+      await expect(service.process(DOCUMENT_ID)).rejects.toBeInstanceOf(
+        DataExtractionFailedError,
+      );
+      expect(repository.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('propagates transient LLM errors unchanged so the queue retries them', async () => {
+      const failure = new Error('connection reset');
+      analyzer.analyze.mockRejectedValue(failure);
+
+      await expect(service.process(DOCUMENT_ID)).rejects.toBe(failure);
     });
 
     it('discards the job when the document no longer exists', async () => {

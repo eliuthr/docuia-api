@@ -4,10 +4,9 @@ import { Job, UnrecoverableError } from 'bullmq';
 import { Env } from '../config/env.schema.js';
 import { BullmqDocumentConsumer } from './bullmq-document.consumer.js';
 import { DocumentProcessingService } from './document-processing.service.js';
-import {
-  GENERIC_FAILURE_REASON,
-  UnreadableDocumentError,
-} from './errors/unreadable-document.error.js';
+import { DataExtractionFailedError } from './errors/data-extraction-failed.error.js';
+import { GENERIC_FAILURE_REASON } from './errors/permanent-processing.error.js';
+import { UnreadableDocumentError } from './errors/unreadable-document.error.js';
 import { DocumentJob } from './queue/document-job.js';
 
 const MAX_ATTEMPTS = 3;
@@ -80,6 +79,21 @@ describe('BullmqDocumentConsumer', () => {
     expect(processing.markFailed).toHaveBeenCalledWith(
       'doc-1',
       'The PDF file is corrupt or cannot be read.',
+    );
+  });
+
+  it('fails a data extraction error immediately with a user-safe reason', async () => {
+    processing.process.mockRejectedValue(
+      new DataExtractionFailedError(new Error('invalid LLM output')),
+    );
+
+    await expect(consumer.process(buildJob(0))).rejects.toBeInstanceOf(
+      UnrecoverableError,
+    );
+
+    expect(processing.markFailed).toHaveBeenCalledWith(
+      'doc-1',
+      'The document data could not be extracted. Try again later.',
     );
   });
 });

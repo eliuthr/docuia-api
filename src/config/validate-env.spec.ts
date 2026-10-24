@@ -1,10 +1,12 @@
 import { validateEnv } from './validate-env.js';
 
 const MONGODB_URI = 'mongodb://localhost:27017/docuia';
+const OPENAI_API_KEY = 'sk-test';
+const REQUIRED = { MONGODB_URI, OPENAI_API_KEY };
 
 describe('validateEnv', () => {
   it('applies defaults when only required variables are set', () => {
-    const env = validateEnv({ MONGODB_URI });
+    const env = validateEnv(REQUIRED);
 
     expect(env).toEqual({
       NODE_ENV: 'development',
@@ -20,18 +22,23 @@ describe('validateEnv', () => {
       PROCESSING_MAX_ATTEMPTS: 3,
       PROCESSING_BACKOFF_MS: 5000,
       WORKER_CONCURRENCY: 2,
+      LLM_DRIVER: 'openai',
+      OPENAI_API_KEY,
+      OPENAI_MODEL: 'gpt-6-luna',
+      LLM_TIMEOUT_MS: 60000,
+      LLM_MAX_INPUT_CHARS: 50000,
     });
   });
 
   it('rejects zero processing attempts', () => {
     expect(() =>
-      validateEnv({ MONGODB_URI, PROCESSING_MAX_ATTEMPTS: '0' }),
+      validateEnv({ ...REQUIRED, PROCESSING_MAX_ATTEMPTS: '0' }),
     ).toThrow(/PROCESSING_MAX_ATTEMPTS/);
   });
 
   it('coerces numeric variables from strings', () => {
     const env = validateEnv({
-      MONGODB_URI,
+      ...REQUIRED,
       PORT: '8080',
       MAX_UPLOAD_SIZE_MB: '5',
     });
@@ -44,15 +51,31 @@ describe('validateEnv', () => {
     expect(() => validateEnv({})).toThrow(/MONGODB_URI/);
   });
 
+  it('requires the OpenAI API key', () => {
+    expect(() => validateEnv({ MONGODB_URI })).toThrow(/OPENAI_API_KEY/);
+  });
+
+  it('rejects an unsupported LLM driver', () => {
+    expect(() => validateEnv({ ...REQUIRED, LLM_DRIVER: 'gemini' })).toThrow(
+      /LLM_DRIVER/,
+    );
+  });
+
+  it('rejects an LLM input limit below the minimum', () => {
+    expect(() =>
+      validateEnv({ ...REQUIRED, LLM_MAX_INPUT_CHARS: '10' }),
+    ).toThrow(/LLM_MAX_INPUT_CHARS/);
+  });
+
   it('rejects an unsupported storage driver', () => {
-    expect(() => validateEnv({ MONGODB_URI, STORAGE_DRIVER: 'ftp' })).toThrow(
+    expect(() => validateEnv({ ...REQUIRED, STORAGE_DRIVER: 'ftp' })).toThrow(
       /STORAGE_DRIVER/,
     );
   });
 
   it('rejects an upload limit above the maximum', () => {
     expect(() =>
-      validateEnv({ MONGODB_URI, MAX_UPLOAD_SIZE_MB: '500' }),
+      validateEnv({ ...REQUIRED, MAX_UPLOAD_SIZE_MB: '500' }),
     ).toThrow(/MAX_UPLOAD_SIZE_MB/);
   });
 });

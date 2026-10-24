@@ -6,8 +6,8 @@ import { Env } from '../config/env.schema.js';
 import { DocumentProcessingService } from './document-processing.service.js';
 import {
   failureReasonFor,
-  UnreadableDocumentError,
-} from './errors/unreadable-document.error.js';
+  PermanentProcessingError,
+} from './errors/permanent-processing.error.js';
 import {
   DOCUMENT_PROCESSING_QUEUE,
   DocumentJob,
@@ -55,7 +55,7 @@ export class BullmqDocumentConsumer
   ): Promise<never> {
     const { documentId } = job.data;
     const isFinal =
-      error instanceof UnreadableDocumentError ||
+      error instanceof PermanentProcessingError ||
       attempt >= (job.opts.attempts ?? DEFAULT_ATTEMPTS);
     const message = error instanceof Error ? error.message : String(error);
     this.logger.warn({

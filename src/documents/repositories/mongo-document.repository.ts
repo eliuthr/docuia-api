@@ -57,12 +57,22 @@ export class MongoDocumentRepository extends DocumentRepository {
 
 /** Los registros creados antes de existir un campo llegan sin él, así que se usa null. */
 function toEntity(record: DocumentRecord): DocumentEntity {
-  const { _id, textStorageKey, pageCount, failureReason, ...fields } = record;
+  const {
+    _id,
+    textStorageKey,
+    pageCount,
+    failureReason,
+    documentType,
+    extractedData,
+    ...fields
+  } = record;
   return {
     id: _id,
     ...fields,
     textStorageKey: textStorageKey ?? null,
     pageCount: pageCount ?? null,
     failureReason: failureReason ?? null,
+    documentType: documentType ?? null,
+    extractedData: extractedData ?? null,
   };
 }

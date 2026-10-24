@@ -1,4 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { DocumentType } from '../../ai/schemas/document-type.js';
+import { ExtractedData } from '../../ai/schemas/extracted-data.js';
 import { DocumentStatus } from '../domain/document-status.enum.js';
 
 @Schema({ collection: 'documents', timestamps: true, versionKey: false })
@@ -29,6 +31,13 @@ export class DocumentRecord {
 
   @Prop({ type: String, default: null })
   failureReason?: string | null;
+
+  @Prop({ type: String, enum: DocumentType, default: null })
+  documentType?: DocumentType | null;
+
+  // Mixed: la forma depende del tipo de documento y ya viene validada con Zod.
+  @Prop({ type: Object, default: null })
+  extractedData?: ExtractedData | null;
 
   createdAt: Date;
   updatedAt: Date;

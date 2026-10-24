@@ -1,5 +1,6 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
+import { AiModule } from '../ai/ai.module.js';
 import { DocumentPersistenceModule } from '../documents/repositories/document-persistence.module.js';
 import { StorageModule } from '../storage/storage.module.js';
 import { BullmqDocumentConsumer } from './bullmq-document.consumer.js';
@@ -16,6 +17,7 @@ import { DOCUMENT_PROCESSING_QUEUE } from './queue/document-job.js';
     BullModule.registerQueue({ name: DOCUMENT_PROCESSING_QUEUE }),
     StorageModule,
     DocumentPersistenceModule,
+    AiModule,
   ],
   providers: [
     DocumentProcessingService,

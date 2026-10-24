@@ -1,4 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { DocumentType } from '../../ai/schemas/document-type.js';
+import { ExtractedData } from '../../ai/schemas/extracted-data.js';
 import { DocumentStatus } from '../domain/document-status.enum.js';
 import { DocumentEntity } from '../domain/document.entity.js';
 
@@ -34,6 +36,32 @@ export class DocumentResponseDto {
   })
   failureReason: string | null;
 
+  @ApiProperty({
+    enum: DocumentType,
+    nullable: true,
+    example: DocumentType.Invoice,
+    description: 'Type detected by the LLM; null until processed',
+  })
+  documentType: DocumentType | null;
+
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+    example: {
+      vendorName: 'Papelería El Centro',
+      invoiceNumber: 'FE-1024',
+      issueDate: '2026-10-01',
+      currency: 'COP',
+      total: 119000,
+    },
+    description:
+      'Data extracted by the LLM. Its shape depends on documentType ' +
+      '(invoice, contract or resume); missing fields are null. ' +
+      'Null for "other" documents or until processed.',
+  })
+  extractedData: ExtractedData | null;
+
   @ApiProperty()
   createdAt: Date;
 
@@ -49,6 +77,8 @@ export class DocumentResponseDto {
       status: entity.status,
       pageCount: entity.pageCount,
       failureReason: entity.failureReason,
+      documentType: entity.documentType,
+      extractedData: entity.extractedData,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     };

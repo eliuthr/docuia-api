@@ -88,6 +88,8 @@ function buildNewDocument(file: UploadedDocumentFile): NewDocument {
     textStorageKey: null,
     pageCount: null,
     failureReason: null,
+    documentType: null,
+    extractedData: null,
   };
 }
 

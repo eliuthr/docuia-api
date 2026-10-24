@@ -56,6 +56,8 @@ describe('Documents (e2e)', () => {
         status: 'pending',
         pageCount: null,
         failureReason: null,
+        documentType: null,
+        extractedData: null,
       });
       expect(response.body.id).toMatch(UUID_V4_PATTERN);
       expect(response.body).not.toHaveProperty('storageKey');
