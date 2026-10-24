@@ -21,6 +21,15 @@ export class DocumentRecord {
   @Prop({ type: String, enum: DocumentStatus, required: true })
   status: DocumentStatus;
 
+  @Prop({ type: String, default: null })
+  textStorageKey?: string | null;
+
+  @Prop({ type: Number, default: null })
+  pageCount?: number | null;
+
+  @Prop({ type: String, default: null })
+  failureReason?: string | null;
+
   createdAt: Date;
   updatedAt: Date;
 }

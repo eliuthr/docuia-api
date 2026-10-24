@@ -6,8 +6,8 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.e2e-spec.ts'],
-    // Read by the env validation when AppModule is imported. MongoDB is
-    // replaced by an in-memory repository, so the URI is never used.
+    // Las lee la validación de variables al importar AppModule. MongoDB se
+    // reemplaza por un repositorio en memoria, así que la URI nunca se usa.
     env: {
       NODE_ENV: 'test',
       MONGODB_URI: 'mongodb://unused-in-e2e',

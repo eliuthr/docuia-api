@@ -28,6 +28,18 @@ describe('LocalStorageProvider', () => {
     expect(stored).toBe('content');
   });
 
+  it('reads back a stored file', async () => {
+    await storage.save('invoice.pdf', Buffer.from('content'));
+
+    const content = await storage.read('invoice.pdf');
+
+    expect(content.toString('utf8')).toBe('content');
+  });
+
+  it('fails to read a file that does not exist', async () => {
+    await expect(storage.read('missing.pdf')).rejects.toThrow();
+  });
+
   it('removes a stored file', async () => {
     await storage.save('invoice.pdf', Buffer.from('content'));
 

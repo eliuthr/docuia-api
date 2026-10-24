@@ -18,6 +18,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
+  ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { documentFileValidationPipe } from './pipes/document-file-validation.pipe.js';
@@ -41,6 +42,9 @@ export class DocumentsController {
   @ApiCreatedResponse({ type: DocumentResponseDto })
   @ApiBadRequestResponse({ description: 'Missing file or unsupported type' })
   @ApiPayloadTooLargeResponse({ description: 'File exceeds the size limit' })
+  @ApiServiceUnavailableResponse({
+    description: 'The processing queue is unavailable; nothing was stored',
+  })
   async upload(
     @UploadedFile(documentFileValidationPipe) file: UploadedDocumentFile,
   ): Promise<DocumentResponseDto> {

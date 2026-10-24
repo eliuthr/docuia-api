@@ -6,7 +6,7 @@ import { Env } from './config/env.schema.js';
 
 const SWAGGER_PATH = 'docs';
 
-/** Applies the cross-cutting setup shared by the server and the e2e tests. */
+/** Aplica la configuración transversal que comparten el servidor y los tests e2e. */
 export function configureApp(app: INestApplication): void {
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 

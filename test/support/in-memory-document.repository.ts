@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import {
+  DocumentChanges,
   DocumentEntity,
   NewDocument,
 } from '../../src/documents/domain/document.entity.js';
@@ -23,6 +24,21 @@ export class InMemoryDocumentRepository extends DocumentRepository {
     const newestFirst = [...this.documents.values()].reverse();
     return Promise.resolve(newestFirst.slice(0, limit));
   }
+
+  update(id: string, changes: DocumentChanges): Promise<DocumentEntity | null> {
+    const current = this.documents.get(id);
+    if (!current) {
+      return Promise.resolve(null);
+    }
+    const updated = { ...current, ...changes, updatedAt: new Date() };
+    this.documents.set(id, updated);
+    return Promise.resolve(updated);
+  }
+
+  delete(id: string): Promise<void> {
+    this.documents.delete(id);
+    return Promise.resolve();
+  }
 }
 
 @Module({
@@ -33,6 +49,6 @@ export class InMemoryDocumentRepository extends DocumentRepository {
 })
 export class InMemoryDocumentPersistenceModule {}
 
-/** Replaces modules that need a live database connection. */
+/** Reemplaza los módulos que necesitan una conexión real a la base de datos. */
 @Module({})
 export class NoDatabaseModule {}

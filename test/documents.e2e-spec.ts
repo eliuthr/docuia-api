@@ -1,7 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { readdir, rm } from 'node:fs/promises';
 import request from 'supertest';
+import { QueueProvider } from '../src/processing/queue/queue.provider.js';
 import { createTestApp } from './support/create-test-app.js';
+import { InMemoryQueueProvider } from './support/in-memory-queue.provider.js';
 
 const STORAGE_DIR = process.env.LOCAL_STORAGE_DIR ?? '';
 const MEGABYTE = 1024 * 1024;
@@ -24,9 +26,15 @@ async function storedFileCount(): Promise<number> {
 
 describe('Documents (e2e)', () => {
   let app: INestApplication;
+  let queue: InMemoryQueueProvider;
 
   beforeAll(async () => {
     app = await createTestApp();
+    queue = app.get(QueueProvider);
+  });
+
+  afterEach(() => {
+    queue.isUnavailable = false;
   });
 
   afterAll(async () => {
@@ -46,9 +54,36 @@ describe('Documents (e2e)', () => {
         mimeType: 'application/pdf',
         sizeBytes: MINIMAL_PDF.length,
         status: 'pending',
+        pageCount: null,
+        failureReason: null,
       });
       expect(response.body.id).toMatch(UUID_V4_PATTERN);
       expect(response.body).not.toHaveProperty('storageKey');
+      expect(response.body).not.toHaveProperty('textStorageKey');
+    });
+
+    it('enqueues a processing job for the uploaded document', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/documents')
+        .attach('file', MINIMAL_PDF, 'queued.pdf')
+        .expect(201);
+
+      expect(queue.jobs).toContainEqual({ documentId: response.body.id });
+    });
+
+    it('responds 503 and stores nothing when the queue is unavailable', async () => {
+      queue.isUnavailable = true;
+      const filesBefore = await storedFileCount();
+      const listBefore = await request(app.getHttpServer()).get('/documents');
+
+      await request(app.getHttpServer())
+        .post('/documents')
+        .attach('file', MINIMAL_PDF, 'lost.pdf')
+        .expect(503);
+
+      const listAfter = await request(app.getHttpServer()).get('/documents');
+      expect(await storedFileCount()).toBe(filesBefore);
+      expect(listAfter.body).toEqual(listBefore.body);
     });
 
     it('accepts a PNG image', async () => {

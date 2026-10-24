@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { DocumentEntity, NewDocument } from '../domain/document.entity.js';
+import {
+  DocumentChanges,
+  DocumentEntity,
+  NewDocument,
+} from '../domain/document.entity.js';
 import { DocumentRecord } from '../schemas/document-record.schema.js';
 import { DocumentRepository } from './document.repository.js';
 
@@ -34,9 +38,31 @@ export class MongoDocumentRepository extends DocumentRepository {
       .exec();
     return records.map(toEntity);
   }
+
+  async update(
+    id: string,
+    changes: DocumentChanges,
+  ): Promise<DocumentEntity | null> {
+    const record = await this.model
+      .findByIdAndUpdate(id, { $set: changes }, { returnDocument: 'after' })
+      .lean<DocumentRecord>()
+      .exec();
+    return record ? toEntity(record) : null;
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.model.deleteOne({ _id: id }).exec();
+  }
 }
 
+/** Los registros creados antes de existir un campo llegan sin él, así que se usa null. */
 function toEntity(record: DocumentRecord): DocumentEntity {
-  const { _id, ...fields } = record;
-  return { id: _id, ...fields };
+  const { _id, textStorageKey, pageCount, failureReason, ...fields } = record;
+  return {
+    id: _id,
+    ...fields,
+    textStorageKey: textStorageKey ?? null,
+    pageCount: pageCount ?? null,
+    failureReason: failureReason ?? null,
+  };
 }

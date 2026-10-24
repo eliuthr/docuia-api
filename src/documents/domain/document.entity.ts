@@ -7,8 +7,19 @@ export interface DocumentEntity {
   sizeBytes: number;
   storageKey: string;
   status: DocumentStatus;
+  textStorageKey: string | null;
+  pageCount: number | null;
+  failureReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export type NewDocument = Omit<DocumentEntity, 'createdAt' | 'updatedAt'>;
+
+/** Campos que el procesamiento puede cambiar después de crear el documento. */
+export type DocumentChanges = Partial<
+  Pick<
+    DocumentEntity,
+    'status' | 'textStorageKey' | 'pageCount' | 'failureReason'
+  >
+>;

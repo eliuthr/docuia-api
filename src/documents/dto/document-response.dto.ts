@@ -18,6 +18,22 @@ export class DocumentResponseDto {
   @ApiProperty({ enum: DocumentStatus, example: DocumentStatus.Pending })
   status: DocumentStatus;
 
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 2,
+    description: 'Number of pages; null for images or until processed',
+  })
+  pageCount: number | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: null,
+    description: 'Why processing failed; set only when status is failed',
+  })
+  failureReason: string | null;
+
   @ApiProperty()
   createdAt: Date;
 
@@ -31,6 +47,8 @@ export class DocumentResponseDto {
       mimeType: entity.mimeType,
       sizeBytes: entity.sizeBytes,
       status: entity.status,
+      pageCount: entity.pageCount,
+      failureReason: entity.failureReason,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     };

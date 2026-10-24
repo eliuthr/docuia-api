@@ -10,8 +10,8 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Requires a file and checks its real type from the magic bytes. The size limit
- * is enforced earlier by Multer so oversized uploads never reach memory.
+ * Exige un archivo y revisa su tipo real por los magic bytes. El límite de tamaño
+ * lo aplica antes Multer, así un archivo demasiado grande nunca llega a memoria.
  */
 export const documentFileValidationPipe = new ParseFilePipe({
   fileIsRequired: true,

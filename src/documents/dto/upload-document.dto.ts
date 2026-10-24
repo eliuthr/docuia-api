@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-/** Describes the multipart body for Swagger; the file itself is validated by a pipe. */
+/** Describe el cuerpo multipart para Swagger; el archivo en sí lo valida un pipe. */
 export class UploadDocumentDto {
   @ApiProperty({
     type: 'string',

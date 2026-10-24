@@ -14,7 +14,19 @@ describe('validateEnv', () => {
       STORAGE_DRIVER: 'local',
       LOCAL_STORAGE_DIR: './uploads',
       MAX_UPLOAD_SIZE_MB: 10,
+      QUEUE_DRIVER: 'bullmq',
+      REDIS_HOST: 'localhost',
+      REDIS_PORT: 6379,
+      PROCESSING_MAX_ATTEMPTS: 3,
+      PROCESSING_BACKOFF_MS: 5000,
+      WORKER_CONCURRENCY: 2,
     });
+  });
+
+  it('rejects zero processing attempts', () => {
+    expect(() =>
+      validateEnv({ MONGODB_URI, PROCESSING_MAX_ATTEMPTS: '0' }),
+    ).toThrow(/PROCESSING_MAX_ATTEMPTS/);
   });
 
   it('coerces numeric variables from strings', () => {
