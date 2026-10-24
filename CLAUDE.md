@@ -13,7 +13,8 @@ API en NestJS que recibe documentos (facturas, contratos, hojas de vida), los pr
 ## Idioma del código
 
 - Código, nombres de variables, funciones, clases y archivos: en inglés.
-- Comentarios, README y mensajes de commit: en inglés (el proyecto es para portafolio internacional).
+- Comentarios en el código: en español, para que yo los entienda con facilidad.
+- README, specs (`docs/`) y mensajes de commit: en inglés (el proyecto es para portafolio internacional).
 - Commits con Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
 
 ## Stack y versiones
