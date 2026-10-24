@@ -1,0 +1,20 @@
+services:
+  mongodb:
+    image: mongo:8
+    container_name: docuia-mongodb
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodb-data:/data/db
+
+  redis:
+    image: redis:8-alpine
+    container_name: docuia-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+
+volumes:
+  mongodb-data:
+  redis-data:
