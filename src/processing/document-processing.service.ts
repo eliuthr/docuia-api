@@ -8,6 +8,7 @@ import {
   DocumentChanges,
   DocumentEntity,
 } from '../documents/domain/document.entity.js';
+import { DocumentEventsPublisher } from '../documents/events/document-events.publisher.js';
 import { DocumentRepository } from '../documents/repositories/document.repository.js';
 import { StorageProvider } from '../storage/storage.provider.js';
 import { DataExtractionFailedError } from './errors/data-extraction-failed.error.js';
@@ -29,6 +30,9 @@ type NullableAnalysis = Pick<
   'documentType' | 'summary' | 'extractedData'
 >;
 
+/** Cambios que incluyen un estado nuevo, que siempre se publica como evento. */
+type StatusChange = DocumentChanges & { status: DocumentStatus };
+
 interface ExtractedContent {
   changes: Pick<DocumentChanges, 'textStorageKey' | 'pageCount'>;
   /** Lo que se le envía al LLM; null si no hay nada que analizar (PDF sin texto). */
@@ -48,6 +52,7 @@ export class DocumentProcessingService {
     private readonly storage: StorageProvider,
     private readonly extractors: TextExtractorRegistry,
     private readonly analyzer: DocumentAnalyzerService,
+    private readonly events: DocumentEventsPublisher,
   ) {}
 
   async process(documentId: string): Promise<void> {
@@ -61,12 +66,10 @@ export class DocumentProcessingService {
       return;
     }
 
-    await this.repository.update(documentId, {
-      status: DocumentStatus.Processing,
-    });
+    await this.changeStatus(documentId, { status: DocumentStatus.Processing });
     const { changes, llmInput } = await this.extractContent(document);
     const analysis = await this.analyze(documentId, llmInput);
-    await this.repository.update(documentId, {
+    await this.changeStatus(documentId, {
       ...changes,
       ...analysis,
       status: DocumentStatus.Ready,
@@ -76,11 +79,20 @@ export class DocumentProcessingService {
   }
 
   async markFailed(documentId: string, reason: string): Promise<void> {
-    await this.repository.update(documentId, {
+    await this.changeStatus(documentId, {
       status: DocumentStatus.Failed,
       failureReason: reason,
     });
     this.logger.warn({ event: 'document.processing.failed', documentId });
+  }
+
+  /** Guarda el cambio y después lo publica, para que los clientes no tengan que consultar. */
+  private async changeStatus(
+    documentId: string,
+    changes: StatusChange,
+  ): Promise<void> {
+    await this.repository.update(documentId, changes);
+    await this.events.publish({ documentId, status: changes.status });
   }
 
   /** Los PDFs se convierten a texto; las imágenes van tal cual al modelo con visión. */

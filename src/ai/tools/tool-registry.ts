@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { ToolDefinition } from '../llm/conversation.js';
-import { parseJson } from '../llm/parse-json.js';
+import { parseJson } from '../../common/json/parse-json.js';
 import { toJsonSchema } from '../llm/to-json-schema.js';
 import { LLM_TOOLS, LlmTool } from './llm-tool.js';
 

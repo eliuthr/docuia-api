@@ -7,6 +7,8 @@ import { StorageModule } from '../storage/storage.module.js';
 import { BYTES_PER_MEGABYTE } from './documents.constants.js';
 import { DocumentsController } from './documents.controller.js';
 import { DocumentsService } from './documents.service.js';
+import { DocumentEventsSubscriberModule } from './events/document-events-subscriber.module.js';
+import { DocumentStatusStreamService } from './events/document-status-stream.service.js';
 import { DocumentPersistenceModule } from './repositories/document-persistence.module.js';
 
 const MAX_FILES_PER_UPLOAD = 1;
@@ -16,6 +18,7 @@ const MAX_FILES_PER_UPLOAD = 1;
     StorageModule,
     DocumentPersistenceModule,
     QueueModule,
+    DocumentEventsSubscriberModule,
     MulterModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({
@@ -29,6 +32,6 @@ const MAX_FILES_PER_UPLOAD = 1;
     }),
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService],
+  providers: [DocumentsService, DocumentStatusStreamService],
 })
 export class DocumentsModule {}

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { InvalidLlmResponseError } from '../errors/invalid-llm-response.error.js';
 import { LlmProvider, StructuredRequest } from '../llm/llm.provider.js';
-import { parseJson } from '../llm/parse-json.js';
+import { parseJson } from '../../common/json/parse-json.js';
 import { toJsonSchema } from '../llm/to-json-schema.js';
 
 /** El primer intento más un reintento, como piden las reglas del proyecto. */

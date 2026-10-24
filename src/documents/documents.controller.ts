@@ -1,10 +1,12 @@
 import {
   Controller,
   Get,
+  MessageEvent,
   Param,
   ParseUUIDPipe,
   Post,
   Query,
+  Sse,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -18,21 +20,27 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
+  ApiProduces,
   ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Observable } from 'rxjs';
 import { documentFileValidationPipe } from './pipes/document-file-validation.pipe.js';
 import { UPLOAD_FIELD_NAME } from './documents.constants.js';
 import { DocumentsService } from './documents.service.js';
 import { DocumentResponseDto } from './dto/document-response.dto.js';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto.js';
 import { UploadDocumentDto } from './dto/upload-document.dto.js';
+import { DocumentStatusStreamService } from './events/document-status-stream.service.js';
 import type { UploadedDocumentFile } from './domain/uploaded-document-file.js';
 
 @ApiTags('documents')
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly documentsService: DocumentsService) {}
+  constructor(
+    private readonly documentsService: DocumentsService,
+    private readonly statusStream: DocumentStatusStreamService,
+  ) {}
 
   @Post()
   @UseInterceptors(FileInterceptor(UPLOAD_FIELD_NAME))
@@ -63,6 +71,21 @@ export class DocumentsController {
     return documents.map((document) =>
       DocumentResponseDto.fromEntity(document),
     );
+  }
+
+  // Va antes de `@Get(':id')`: si no, Express tomaría "events" como un id.
+  @Sse('events')
+  @ApiOperation({
+    summary: 'Stream document status changes (Server-Sent Events)',
+  })
+  @ApiProduces('text/event-stream')
+  @ApiOkResponse({
+    description:
+      'Events: `document.updated` ({ documentId, status }) when the worker changes a ' +
+      'status, and `ping` ({}) periodically to keep the connection open.',
+  })
+  streamStatusEvents(): Observable<MessageEvent> {
+    return this.statusStream.stream();
   }
 
   @Get(':id')

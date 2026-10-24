@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const STORAGE_DRIVERS = ['local'] as const;
 export const QUEUE_DRIVERS = ['bullmq'] as const;
 export const LLM_DRIVERS = ['openai'] as const;
+export const EVENTS_DRIVERS = ['redis'] as const;
 
 export const envSchema = z.object({
   NODE_ENV: z
@@ -20,6 +21,13 @@ export const envSchema = z.object({
   PROCESSING_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
   PROCESSING_BACKOFF_MS: z.coerce.number().int().min(100).default(5000),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(2),
+  EVENTS_DRIVER: z.enum(EVENTS_DRIVERS).default('redis'),
+  EVENTS_HEARTBEAT_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(60000)
+    .default(25000),
   LLM_DRIVER: z.enum(LLM_DRIVERS).default('openai'),
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_MODEL: z.string().min(1).default('gpt-6-luna'),

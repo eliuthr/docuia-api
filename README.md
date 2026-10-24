@@ -32,6 +32,7 @@ npm run start:worker:dev  # worker (terminal 2)
 | GET    | `/health`            | Liveness check                                 |
 | POST   | `/documents`         | Upload a PDF, PNG or JPEG (`file` form field)  |
 | GET    | `/documents`         | List recent documents (`?limit=1..100`)        |
+| GET    | `/documents/events`  | Stream status changes (SSE)                    |
 | GET    | `/documents/:id`     | Get a document and its processing status       |
 | POST   | `/documents/:id/ask` | Ask about one document (SSE stream)            |
 | POST   | `/ask`               | Ask about all processed documents (SSE stream) |
@@ -102,6 +103,10 @@ the answer), `done` and `error`. Since the endpoints are `POST`, browsers read t
 
 Cost controls: cheap model by default, input truncated to `LLM_MAX_INPUT_CHARS`, bounded output
 tokens and no SDK-level retries. Tests never call the API: the LLM is always mocked.
+
+Every status change is published by the worker on a Redis pub/sub channel and pushed to browsers
+through `GET /documents/events` (Server-Sent Events), so the web client refreshes only when
+something changed instead of polling.
 
 The worker logic (`DocumentProcessingService`) does not depend on BullMQ, so the same code can run
 from an SQS-triggered Lambda on AWS.

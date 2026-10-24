@@ -7,7 +7,7 @@ import { BullmqConnectionModule } from './bullmq-connection.module.js';
 import { BullmqQueueProvider } from './bullmq-queue.provider.js';
 import { DOCUMENT_PROCESSING_QUEUE } from './document-job.js';
 import { QueueProvider } from './queue.provider.js';
-import { redisConnection } from './redis-connection.js';
+import { redisConnection } from '../../common/redis/redis-connection.js';
 
 /** Lado productor de la cola de procesamiento; lo usa la API. */
 @Module({

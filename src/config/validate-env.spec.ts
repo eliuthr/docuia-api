@@ -22,6 +22,8 @@ describe('validateEnv', () => {
       PROCESSING_MAX_ATTEMPTS: 3,
       PROCESSING_BACKOFF_MS: 5000,
       WORKER_CONCURRENCY: 2,
+      EVENTS_DRIVER: 'redis',
+      EVENTS_HEARTBEAT_MS: 25000,
       LLM_DRIVER: 'openai',
       OPENAI_API_KEY,
       OPENAI_MODEL: 'gpt-6-luna',
@@ -72,6 +74,12 @@ describe('validateEnv', () => {
     expect(() =>
       validateEnv({ ...REQUIRED, AGENT_MAX_ITERATIONS: '50' }),
     ).toThrow(/AGENT_MAX_ITERATIONS/);
+  });
+
+  it('rejects a heartbeat interval above the maximum', () => {
+    expect(() =>
+      validateEnv({ ...REQUIRED, EVENTS_HEARTBEAT_MS: '120000' }),
+    ).toThrow(/EVENTS_HEARTBEAT_MS/);
   });
 
   it('rejects an unsupported storage driver', () => {

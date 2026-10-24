@@ -5,6 +5,7 @@ import { DocumentAnalyzerService } from '../ai/extraction/document-analyzer.serv
 import { DocumentType } from '../ai/schemas/document-type.js';
 import { DocumentStatus } from '../documents/domain/document-status.enum.js';
 import { DocumentEntity } from '../documents/domain/document.entity.js';
+import { DocumentEventsPublisher } from '../documents/events/document-events.publisher.js';
 import { DocumentRepository } from '../documents/repositories/document.repository.js';
 import { StorageProvider } from '../storage/storage.provider.js';
 import { DocumentProcessingService } from './document-processing.service.js';
@@ -52,6 +53,7 @@ describe('DocumentProcessingService', () => {
   let extractor: { extract: ReturnType<typeof vi.fn> };
   let registry: { forMimeType: ReturnType<typeof vi.fn> };
   let analyzer: { analyze: ReturnType<typeof vi.fn> };
+  let events: { publish: ReturnType<typeof vi.fn> };
   let service: DocumentProcessingService;
 
   beforeEach(() => {
@@ -82,11 +84,13 @@ describe('DocumentProcessingService', () => {
         extractedData: INVOICE_DATA,
       }),
     };
+    events = { publish: vi.fn().mockResolvedValue(undefined) };
     service = new DocumentProcessingService(
       repository as unknown as DocumentRepository,
       storage as unknown as StorageProvider,
       registry as unknown as TextExtractorRegistry,
       analyzer as unknown as DocumentAnalyzerService,
+      events as unknown as DocumentEventsPublisher,
     );
   });
 
@@ -219,6 +223,39 @@ describe('DocumentProcessingService', () => {
       await expect(service.process(DOCUMENT_ID)).rejects.toBe(failure);
 
       expect(repository.update).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('status events', () => {
+    it('publishes processing and then ready, each after storing it', async () => {
+      await service.process(DOCUMENT_ID);
+
+      expect(events.publish.mock.calls).toEqual([
+        [{ documentId: DOCUMENT_ID, status: DocumentStatus.Processing }],
+        [{ documentId: DOCUMENT_ID, status: DocumentStatus.Ready }],
+      ]);
+      const [firstUpdateOrder] = repository.update.mock.invocationCallOrder;
+      const [firstPublishOrder] = events.publish.mock.invocationCallOrder;
+      expect(firstUpdateOrder).toBeLessThan(firstPublishOrder);
+    });
+
+    it('publishes the failed status', async () => {
+      await service.markFailed(DOCUMENT_ID, 'Corrupt PDF.');
+
+      expect(events.publish).toHaveBeenCalledWith({
+        documentId: DOCUMENT_ID,
+        status: DocumentStatus.Failed,
+      });
+    });
+
+    it('publishes nothing for a document that is already finished', async () => {
+      repository.findById.mockResolvedValue(
+        buildDocument({ status: DocumentStatus.Ready }),
+      );
+
+      await service.process(DOCUMENT_ID);
+
+      expect(events.publish).not.toHaveBeenCalled();
     });
   });
 
