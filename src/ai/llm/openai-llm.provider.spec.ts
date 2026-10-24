@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI, { RateLimitError } from 'openai';
 import { Env } from '../../config/env.schema.js';
 import { LlmQuotaExceededError } from '../errors/llm-quota-exceeded.error.js';
+import { TurnEvent, TurnRequest } from './conversation.js';
 import { StructuredRequest } from './llm.provider.js';
 import { OpenAiLlmProvider } from './openai-llm.provider.js';
 
@@ -111,5 +112,124 @@ describe('OpenAiLlmProvider', () => {
     create.mockRejectedValue(failure);
 
     await expect(provider.generateJson(buildRequest())).rejects.toBe(failure);
+  });
+
+  describe('streamTurn', () => {
+    const completedResponse = {
+      status: 'completed',
+      usage: { input_tokens: 20, output_tokens: 8 },
+      output: [
+        {
+          type: 'function_call',
+          call_id: 'call-1',
+          name: 'find_documents',
+          arguments: '{}',
+        },
+      ],
+    };
+
+    function buildTurnRequest(): TurnRequest {
+      return {
+        logContext: { endpoint: 'ask' },
+        instructions: 'Answer the question.',
+        items: [{ kind: 'user_message', text: '¿Cuánto suman?' }],
+        tools: [
+          { name: 'find_documents', description: 'Find', parameters: {} },
+        ],
+        maxOutputTokens: 500,
+        signal: new AbortController().signal,
+      };
+    }
+
+    async function* streamOf(events: unknown[]): AsyncGenerator<unknown> {
+      for (const event of events) {
+        yield await Promise.resolve(event);
+      }
+    }
+
+    async function collect(
+      events: AsyncIterable<TurnEvent>,
+    ): Promise<TurnEvent[]> {
+      const collected: TurnEvent[] = [];
+      for await (const event of events) {
+        collected.push(event);
+      }
+      return collected;
+    }
+
+    it('streams text deltas and ends with the completed items', async () => {
+      create.mockResolvedValue(
+        streamOf([
+          { type: 'response.output_text.delta', delta: 'Hola' },
+          { type: 'response.in_progress' },
+          { type: 'response.completed', response: completedResponse },
+        ]),
+      );
+
+      await expect(
+        collect(provider.streamTurn(buildTurnRequest())),
+      ).resolves.toEqual([
+        { type: 'text_delta', text: 'Hola' },
+        {
+          type: 'turn_completed',
+          items: [
+            {
+              kind: 'tool_call',
+              callId: 'call-1',
+              toolName: 'find_documents',
+              arguments: '{}',
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('requests a stream with strict tools and the abort signal', async () => {
+      create.mockResolvedValue(streamOf([]));
+      const request = buildTurnRequest();
+
+      await collect(provider.streamTurn(request));
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: MODEL,
+          stream: true,
+          store: false,
+          input: [{ role: 'user', content: '¿Cuánto suman?' }],
+          tools: [expect.objectContaining({ strict: true })],
+        }),
+        { signal: request.signal },
+      );
+    });
+
+    it('uses the partial output of an incomplete response', async () => {
+      create.mockResolvedValue(
+        streamOf([
+          { type: 'response.incomplete', response: completedResponse },
+        ]),
+      );
+
+      const events = await collect(provider.streamTurn(buildTurnRequest()));
+
+      expect(events).toEqual([
+        expect.objectContaining({ type: 'turn_completed' }),
+      ]);
+    });
+
+    it('throws when the stream reports a failure', async () => {
+      create.mockResolvedValue(streamOf([{ type: 'response.failed' }]));
+
+      await expect(
+        collect(provider.streamTurn(buildTurnRequest())),
+      ).rejects.toThrow(/stream failed/);
+    });
+
+    it('maps an exhausted quota to LlmQuotaExceededError', async () => {
+      create.mockRejectedValue(rateLimitError('insufficient_quota'));
+
+      await expect(
+        collect(provider.streamTurn(buildTurnRequest())),
+      ).rejects.toBeInstanceOf(LlmQuotaExceededError);
+    });
   });
 });

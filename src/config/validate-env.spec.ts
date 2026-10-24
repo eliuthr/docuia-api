@@ -27,6 +27,7 @@ describe('validateEnv', () => {
       OPENAI_MODEL: 'gpt-6-luna',
       LLM_TIMEOUT_MS: 60000,
       LLM_MAX_INPUT_CHARS: 50000,
+      AGENT_MAX_ITERATIONS: 5,
     });
   });
 
@@ -65,6 +66,12 @@ describe('validateEnv', () => {
     expect(() =>
       validateEnv({ ...REQUIRED, LLM_MAX_INPUT_CHARS: '10' }),
     ).toThrow(/LLM_MAX_INPUT_CHARS/);
+  });
+
+  it('rejects an agent iteration limit above the maximum', () => {
+    expect(() =>
+      validateEnv({ ...REQUIRED, AGENT_MAX_ITERATIONS: '50' }),
+    ).toThrow(/AGENT_MAX_ITERATIONS/);
   });
 
   it('rejects an unsupported storage driver', () => {

@@ -11,7 +11,6 @@ const validContract = {
   value: 1500000,
   currency: 'COP',
   governingLaw: 'Colombia',
-  summary: 'Arrendamiento de un apartamento por un año.',
 };
 
 describe('contractSchema', () => {

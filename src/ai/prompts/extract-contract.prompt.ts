@@ -8,6 +8,5 @@ Fields:
 - effectiveDate, expirationDate: YYYY-MM-DD.
 - value, currency: the total or periodic contract value, if stated.
 - governingLaw: the jurisdiction or applicable law, if stated.
-- summary: two sentences at most describing what the contract is about.
 
 ${EXTRACTION_RULES}`;

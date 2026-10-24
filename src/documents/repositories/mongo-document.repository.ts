@@ -6,8 +6,10 @@ import {
   DocumentEntity,
   NewDocument,
 } from '../domain/document.entity.js';
+import { DocumentSearchCriteria } from '../domain/document-search-criteria.js';
 import { DocumentRecord } from '../schemas/document-record.schema.js';
 import { DocumentRepository } from './document.repository.js';
+import { buildSearchFilter } from './mongo-search-filter.js';
 
 @Injectable()
 export class MongoDocumentRepository extends DocumentRepository {
@@ -39,6 +41,16 @@ export class MongoDocumentRepository extends DocumentRepository {
     return records.map(toEntity);
   }
 
+  async search(criteria: DocumentSearchCriteria): Promise<DocumentEntity[]> {
+    const records = await this.model
+      .find(buildSearchFilter(criteria))
+      .sort({ createdAt: -1 })
+      .limit(criteria.limit)
+      .lean<DocumentRecord[]>()
+      .exec();
+    return records.map(toEntity);
+  }
+
   async update(
     id: string,
     changes: DocumentChanges,
@@ -63,6 +75,7 @@ function toEntity(record: DocumentRecord): DocumentEntity {
     pageCount,
     failureReason,
     documentType,
+    summary,
     extractedData,
     ...fields
   } = record;
@@ -73,6 +86,7 @@ function toEntity(record: DocumentRecord): DocumentEntity {
     pageCount: pageCount ?? null,
     failureReason: failureReason ?? null,
     documentType: documentType ?? null,
+    summary: summary ?? null,
     extractedData: extractedData ?? null,
   };
 }

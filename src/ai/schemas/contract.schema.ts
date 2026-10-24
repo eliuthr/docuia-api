@@ -19,7 +19,6 @@ export const contractSchema = z.object({
   value: nullableAmount,
   currency: nullableCurrencyCode,
   governingLaw: nullableText,
-  summary: nullableText,
 });
 
 export type ContractData = z.infer<typeof contractSchema>;

@@ -13,6 +13,7 @@ export interface DocumentEntity {
   pageCount: number | null;
   failureReason: string | null;
   documentType: DocumentType | null;
+  summary: string | null;
   extractedData: ExtractedData | null;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +30,7 @@ export type DocumentChanges = Partial<
     | 'pageCount'
     | 'failureReason'
     | 'documentType'
+    | 'summary'
     | 'extractedData'
   >
 >;

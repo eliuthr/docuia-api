@@ -45,6 +45,15 @@ export class DocumentResponseDto {
   documentType: DocumentType | null;
 
   @ApiProperty({
+    type: String,
+    nullable: true,
+    example:
+      'Factura de Papelería El Centro por 119.000 COP con fecha 1 de octubre de 2026.',
+    description: 'Short summary written by the LLM; null until processed',
+  })
+  summary: string | null;
+
+  @ApiProperty({
     type: 'object',
     additionalProperties: true,
     nullable: true,
@@ -78,6 +87,7 @@ export class DocumentResponseDto {
       pageCount: entity.pageCount,
       failureReason: entity.failureReason,
       documentType: entity.documentType,
+      summary: entity.summary,
       extractedData: entity.extractedData,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,

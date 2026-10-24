@@ -20,10 +20,14 @@ const FINISHED_STATUSES: ReadonlySet<DocumentStatus> = new Set([
 ]);
 const NO_ANALYSIS: NullableAnalysis = {
   documentType: null,
+  summary: null,
   extractedData: null,
 };
 
-type NullableAnalysis = Pick<DocumentChanges, 'documentType' | 'extractedData'>;
+type NullableAnalysis = Pick<
+  DocumentChanges,
+  'documentType' | 'summary' | 'extractedData'
+>;
 
 interface ExtractedContent {
   changes: Pick<DocumentChanges, 'textStorageKey' | 'pageCount'>;

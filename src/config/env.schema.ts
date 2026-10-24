@@ -25,6 +25,7 @@ export const envSchema = z.object({
   OPENAI_MODEL: z.string().min(1).default('gpt-6-luna'),
   LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).default(60000),
   LLM_MAX_INPUT_CHARS: z.coerce.number().int().min(1000).default(50000),
+  AGENT_MAX_ITERATIONS: z.coerce.number().int().min(2).max(10).default(5),
 });
 
 export type Env = z.infer<typeof envSchema>;

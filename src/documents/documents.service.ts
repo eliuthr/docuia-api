@@ -89,6 +89,7 @@ function buildNewDocument(file: UploadedDocumentFile): NewDocument {
     pageCount: null,
     failureReason: null,
     documentType: null,
+    summary: null,
     extractedData: null,
   };
 }

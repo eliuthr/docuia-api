@@ -1,9 +1,12 @@
+import { TurnEvent, TurnRequest } from './conversation.js';
+import { JsonSchema } from './json-schema.js';
+
+export type { JsonSchema };
+
 /** Contenido que se le envía al modelo: texto plano o una imagen (visión). */
 export type LlmInput =
   | { kind: 'text'; text: string }
   | { kind: 'image'; mimeType: string; content: Buffer };
-
-export type JsonSchema = Record<string, unknown>;
 
 export interface StructuredRequest {
   /** Id del documento; solo se usa en los logs. */
@@ -27,4 +30,11 @@ export abstract class LlmProvider {
    * forma de `jsonSchema`. No es confiable: quien llama lo valida con Zod.
    */
   abstract generateJson(request: StructuredRequest): Promise<string>;
+
+  /**
+   * Hace una vuelta de conversación con herramientas: emite el texto a medida
+   * que llega y termina con `turn_completed`. No ejecuta herramientas; eso lo
+   * hace quien llama.
+   */
+  abstract streamTurn(request: TurnRequest): AsyncIterable<TurnEvent>;
 }

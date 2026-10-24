@@ -57,6 +57,7 @@ describe('Documents (e2e)', () => {
         pageCount: null,
         failureReason: null,
         documentType: null,
+        summary: null,
         extractedData: null,
       });
       expect(response.body.id).toMatch(UUID_V4_PATTERN);

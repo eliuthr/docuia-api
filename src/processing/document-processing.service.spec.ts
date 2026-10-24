@@ -15,6 +15,7 @@ import { TextExtractorRegistry } from './extraction/text-extractor.registry.js';
 
 const DOCUMENT_ID = 'doc-1';
 const INVOICE_DATA = { invoiceNumber: 'FE-1', total: 150 };
+const SUMMARY = 'Factura FE-1 por 150.';
 
 function buildDocument(
   overrides: Partial<DocumentEntity> = {},
@@ -31,6 +32,7 @@ function buildDocument(
     pageCount: null,
     failureReason: null,
     documentType: null,
+    summary: null,
     extractedData: null,
     createdAt: now,
     updatedAt: now,
@@ -76,6 +78,7 @@ describe('DocumentProcessingService', () => {
     analyzer = {
       analyze: vi.fn().mockResolvedValue({
         documentType: DocumentType.Invoice,
+        summary: SUMMARY,
         extractedData: INVOICE_DATA,
       }),
     };
@@ -109,6 +112,7 @@ describe('DocumentProcessingService', () => {
         pageCount: 2,
         failureReason: null,
         documentType: DocumentType.Invoice,
+        summary: SUMMARY,
         extractedData: INVOICE_DATA,
       });
     });
@@ -134,6 +138,7 @@ describe('DocumentProcessingService', () => {
         pageCount: null,
         failureReason: null,
         documentType: DocumentType.Invoice,
+        summary: SUMMARY,
         extractedData: INVOICE_DATA,
       });
     });
@@ -150,6 +155,7 @@ describe('DocumentProcessingService', () => {
           status: DocumentStatus.Ready,
           pageCount: 1,
           documentType: null,
+          summary: null,
           extractedData: null,
         }),
       );

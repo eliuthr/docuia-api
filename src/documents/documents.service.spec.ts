@@ -78,6 +78,7 @@ describe('DocumentsService', () => {
         pageCount: null,
         failureReason: null,
         documentType: null,
+        summary: null,
         extractedData: null,
       });
       expect(storage.save).toHaveBeenCalledWith(
@@ -148,6 +149,7 @@ describe('DocumentsService', () => {
         pageCount: null,
         failureReason: null,
         documentType: null,
+        summary: null,
         extractedData: null,
       });
       repository.findById.mockResolvedValue(existing);

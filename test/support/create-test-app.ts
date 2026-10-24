@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { LlmProvider } from '../../src/ai/llm/llm.provider.js';
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
 import { DatabaseModule } from '../../src/database/database.module.js';
@@ -10,8 +11,9 @@ import {
   NoDatabaseModule,
 } from './in-memory-document.repository.js';
 import { InMemoryQueueModule } from './in-memory-queue.provider.js';
+import { ScriptedLlmProvider } from './scripted-llm.provider.js';
 
-/** Arranca la app completa sin MongoDB ni Redis, con dobles en memoria. */
+/** Arranca la app completa sin MongoDB, Redis ni LLM real, con dobles en memoria. */
 export async function createTestApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideModule(DatabaseModule)
@@ -20,6 +22,8 @@ export async function createTestApp(): Promise<INestApplication> {
     .useModule(InMemoryDocumentPersistenceModule)
     .overrideModule(QueueModule)
     .useModule(InMemoryQueueModule)
+    .overrideProvider(LlmProvider)
+    .useValue(new ScriptedLlmProvider())
     .compile();
 
   const app = moduleRef.createNestApplication();
