@@ -1,0 +1,5 @@
+node_modules
+dist
+cdk.out
+# Paquete de las Lambdas que genera scripts/package-lambda.mjs
+.lambda-build

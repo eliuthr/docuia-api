@@ -3,8 +3,8 @@
 NestJS API that receives documents (invoices, contracts, résumés), processes them in the
 background and uses an LLM with tool calling to extract data and answer questions about them.
 
-> Status: phase 5 — LangGraph.js agent with answer verification and conversation history. See [`docs/specs`](docs/specs) for the
-> spec-driven roadmap.
+> Status: phase 6 — deployable to AWS (Lambda, S3, SQS, DynamoDB) within the free tier. See
+> [`docs/specs`](docs/specs) for the spec-driven roadmap.
 
 ## Stack
 
@@ -51,13 +51,17 @@ curl -N -H "Content-Type: application/json" \
 Controllers validate input and delegate to services. Everything that differs between local and
 AWS sits behind an injectable abstraction selected by configuration:
 
-| Abstraction              | Local                  | AWS (planned) |
-| ------------------------ | ---------------------- | ------------- |
-| `StorageProvider`        | `LocalStorageProvider` | S3            |
-| `DocumentRepository`     | MongoDB                | DynamoDB      |
-| `ConversationRepository` | MongoDB                | DynamoDB      |
-| `QueueProvider`          | BullMQ (Redis)         | SQS           |
-| `LlmProvider`            | OpenAI                 | OpenAI        |
+| Abstraction              | Local (default)        | AWS                 | Variable          |
+| ------------------------ | ---------------------- | ------------------- | ----------------- |
+| `StorageProvider`        | `LocalStorageProvider` | S3                  | `STORAGE_DRIVER`  |
+| `DocumentRepository`     | MongoDB                | DynamoDB            | `DATABASE_DRIVER` |
+| `ConversationRepository` | MongoDB                | DynamoDB            | `DATABASE_DRIVER` |
+| `QueueProvider`          | BullMQ (Redis)         | SQS                 | `QUEUE_DRIVER`    |
+| Status events            | Redis pub/sub          | none (client polls) | `EVENTS_DRIVER`   |
+| `LlmProvider`            | OpenAI                 | OpenAI              | `LLM_DRIVER`      |
+
+Each driver's module is loaded only when it is selected (`ConditionalModule`), so the AWS
+deployment never opens a MongoDB or Redis connection.
 
 The API never processes documents inside the HTTP request: it stores the file, persists the
 document as `pending`, enqueues a job and responds. A separate worker process consumes the queue:
@@ -143,16 +147,36 @@ something changed instead of polling.
 The worker logic (`DocumentProcessingService`) does not depend on BullMQ, so the same code can run
 from an SQS-triggered Lambda on AWS.
 
+## AWS deployment
+
+```
+browser ──HTTPS──► API Lambda (NestJS + Lambda Web Adapter, function URL with streaming)
+                      │ S3 (files) · DynamoDB (documents, conversations, messages)
+                      └─► SQS ──► worker Lambda ──► OpenAI          failed jobs ─► DLQ
+```
+
+- **Same code, two environments**: the API runs unchanged on Lambda through the Lambda Web
+  Adapter; the worker logic (`DocumentJobRunner`) is shared by the BullMQ consumer and the
+  SQS-triggered Lambda.
+- **Free tier by design**: arm64 Lambdas without a VPC (no NAT Gateway), DynamoDB provisioned
+  at exactly the 25 free read/write units, 7-day log retention, a 104 MB Lambda package
+  (types, source maps and docs pruned).
+- **Infrastructure as code** with the AWS CDK in [`infra/`](infra), with assertion tests.
+
+Step-by-step guide (account, budget alerts, `aws login`, deploy, destroy):
+[`docs/aws-setup.md`](docs/aws-setup.md).
+
 ## Scripts
 
-| Command                    | Description                            |
-| -------------------------- | -------------------------------------- |
-| `npm run start:dev`        | API in watch mode                      |
-| `npm run start:worker:dev` | Worker in watch mode                   |
-| `npm run lint`             | oxlint (type-aware)                    |
-| `npm run test`             | Unit tests                             |
-| `npm run test:e2e`         | e2e tests (no MongoDB or Redis needed) |
-| `npm run build`            | Production build                       |
+| Command                     | Description                               |
+| --------------------------- | ----------------------------------------- |
+| `npm run start:dev`         | API in watch mode                         |
+| `npm run start:worker:dev`  | Worker in watch mode                      |
+| `npm run lint`              | oxlint (type-aware)                       |
+| `npm run test`              | Unit tests                                |
+| `npm run test:e2e`          | e2e tests (no MongoDB or Redis needed)    |
+| `npm run build`             | Production build                          |
+| `npm run deploy` (`infra/`) | Package and deploy to AWS (see the guide) |
 
 ## Configuration
 

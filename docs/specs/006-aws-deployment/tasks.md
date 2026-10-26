@@ -17,9 +17,9 @@ Code (no AWS account needed):
 
 Infrastructure:
 
-- [ ] **T11** `infra/` CDK project: stack, packaging script, CDK assertion tests. (US-6, NFR-1,
+- [x] **T11** `infra/` CDK project: stack, packaging script, CDK assertion tests. (US-6, NFR-1,
       NFR-3, NFR-4)
-- [ ] **T12** `docs/aws-setup.md`: account, MFA, budget alert, CLI credentials, bootstrap,
+- [x] **T12** `docs/aws-setup.md`: account, MFA, budget alert, CLI credentials, bootstrap,
       deploy, destroy. README section.
 
 Deployment (with the owner):
@@ -29,3 +29,24 @@ Deployment (with the owner):
       billing.
 
 ## Verification log
+
+- 2026-10-26 — Code (T1–T10): lint clean; 311 unit tests and 38 e2e tests pass; build OK. The
+  AWS wiring test compiles the API and the Lambda worker with the AWS drivers and finds no
+  MongoDB connection. The local API kept working with the default drivers.
+- 2026-10-26 — Infrastructure (T11–T12): 10 CDK assertion tests pass; `cdk synth` produces the
+  stack and uses the Lambda zip as-is.
+- Lambda package checked in Linux containers before any deploy:
+  - `run.sh` is stored with mode 755 and LF line endings.
+  - Extracted from the zip inside a `node:24-alpine` container with the AWS variables, the API
+    started (`GET /health` → 200, JSON logs) and `GET /documents/events` → 503; the worker
+    handler module imports and exports `handler`.
+  - Unzipped size 104 MB after pruning (243 MB before).
+- Implementation notes:
+  - `ConditionalModule` decides when the module file is imported, so the AWS wiring test sets
+    the variables before importing the root modules (Lambda sets them before the process
+    starts).
+  - Running the packaged app from a Windows folder mounted in Docker was too slow to start
+    (thousands of small files over the shared mount); extracting the zip inside the container
+    is representative of Lambda.
+  - Git Bash rewrites Linux paths in `docker` arguments; `MSYS_NO_PATHCONV=1` avoids it for
+    manual commands (the packaging script runs Docker from Node, so it is not affected).

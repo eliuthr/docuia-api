@@ -1,0 +1,4 @@
+{
+  "buildDir": ".lambda-build",
+  "zipFile": "docuia-lambda.zip"
+}

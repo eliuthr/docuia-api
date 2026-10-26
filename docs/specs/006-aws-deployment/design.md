@@ -39,12 +39,12 @@ Concepts:
 
 ## Driver selection
 
-| Variable          | Local (default) | AWS        | Module chosen                                   |
-| ----------------- | --------------- | ---------- | ----------------------------------------------- |
-| `DATABASE_DRIVER` | `mongodb`       | `dynamodb` | `DatabaseModule`, both persistence modules      |
-| `STORAGE_DRIVER`  | `local`         | `s3`       | `StorageModule`                                 |
-| `QUEUE_DRIVER`    | `bullmq`        | `sqs`      | `QueueModule` (producer); worker entry point    |
-| `EVENTS_DRIVER`   | `redis`         | `none`     | events publisher and subscriber modules         |
+| Variable          | Local (default) | AWS        | Module chosen                                |
+| ----------------- | --------------- | ---------- | -------------------------------------------- |
+| `DATABASE_DRIVER` | `mongodb`       | `dynamodb` | `DatabaseModule`, both persistence modules   |
+| `STORAGE_DRIVER`  | `local`         | `s3`       | `StorageModule`                              |
+| `QUEUE_DRIVER`    | `bullmq`        | `sqs`      | `QueueModule` (producer); worker entry point |
+| `EVENTS_DRIVER`   | `redis`         | `none`     | events publisher and subscriber modules      |
 
 Each infrastructure module becomes a thin module that imports one driver module with
 `ConditionalModule.registerWhen` (from `@nestjs/config`), through a shared helper:
@@ -72,15 +72,15 @@ Environment validation becomes a refinement on the Zod schema: `MONGODB_URI` is 
 
 ## New environment variables
 
-| Variable                       | Used with  | Notes                                       |
-| ------------------------------ | ---------- | ------------------------------------------- |
-| `DATABASE_DRIVER`              | always     | `mongodb` (default) or `dynamodb`           |
-| `AWS_REGION`                   | AWS        | set by Lambda; local default `us-east-1`    |
-| `S3_BUCKET`                    | `s3`       | set by CDK                                  |
-| `SQS_QUEUE_URL`                | `sqs`      | set by CDK                                  |
-| `DYNAMODB_DOCUMENTS_TABLE`     | `dynamodb` | set by CDK                                  |
-| `DYNAMODB_CONVERSATIONS_TABLE` | `dynamodb` | set by CDK                                  |
-| `DYNAMODB_MESSAGES_TABLE`      | `dynamodb` | set by CDK                                  |
+| Variable                       | Used with  | Notes                                    |
+| ------------------------------ | ---------- | ---------------------------------------- |
+| `DATABASE_DRIVER`              | always     | `mongodb` (default) or `dynamodb`        |
+| `AWS_REGION`                   | AWS        | set by Lambda; local default `us-east-1` |
+| `S3_BUCKET`                    | `s3`       | set by CDK                               |
+| `SQS_QUEUE_URL`                | `sqs`      | set by CDK                               |
+| `DYNAMODB_DOCUMENTS_TABLE`     | `dynamodb` | set by CDK                               |
+| `DYNAMODB_CONVERSATIONS_TABLE` | `dynamodb` | set by CDK                               |
+| `DYNAMODB_MESSAGES_TABLE`      | `dynamodb` | set by CDK                               |
 
 `MAX_UPLOAD_SIZE_MB` is set to 5 on AWS (AC-6.3). `CORS_ORIGIN` stays configurable. `LOG_FORMAT`
 (`pretty` | `json`) is `json` on AWS.
@@ -124,11 +124,11 @@ docs/aws-setup.md                            account, MFA, budget, CLI credentia
 
 ## DynamoDB data model
 
-| Table           | Partition key    | Sort key                     | GSI                                               |
-| --------------- | ---------------- | ---------------------------- | ------------------------------------------------- |
-| `documents`     | `id`             | —                            | `byCreatedAt`: `listKey` = `"DOCUMENT"`, `createdAtId` = `<ISO date>#<id>` |
-| `conversations` | `id`             | —                            | `byScope`: `scopeKey` = document id or `"COLLECTION"`, `updatedAt` |
-| `messages`      | `conversationId` | `sequence` (number)          | —                                                 |
+| Table           | Partition key    | Sort key            | GSI                                                                        |
+| --------------- | ---------------- | ------------------- | -------------------------------------------------------------------------- |
+| `documents`     | `id`             | —                   | `byCreatedAt`: `listKey` = `"DOCUMENT"`, `createdAtId` = `<ISO date>#<id>` |
+| `conversations` | `id`             | —                   | `byScope`: `scopeKey` = document id or `"COLLECTION"`, `updatedAt`         |
+| `messages`      | `conversationId` | `sequence` (number) | —                                                                          |
 
 - **Document pages** query `byCreatedAt` newest first (`ScanIndexForward: false`) with
   `Limit: limit + 1`; the cursor becomes the `ExclusiveStartKey`
@@ -180,11 +180,21 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> { … 
 
 ## Packaging
 
-`infra/scripts/package-lambda.mjs` (Node, works on Windows): runs `npm run build` in the API,
-copies `dist/`, `package.json` and `package-lock.json` to `infra/.lambda/`, runs
-`npm ci --omit=dev` there and writes `run.sh`. Both Lambdas use the same asset with different
-handlers. esbuild bundling is not used because NestJS needs `emitDecoratorMetadata`, which
-esbuild does not support.
+`infra/scripts/package-lambda.mjs` (Node, works on Windows) builds one zip that both Lambdas use:
+
+1. `npm run build` in the API.
+2. Copies `dist/`, `package.json` and `package-lock.json` to `infra/.lambda-build/staging` and
+   writes `run.sh` (`exec node dist/main.js`) with LF line endings.
+3. `npm ci --omit=dev --ignore-scripts --os=linux --cpu=arm64` there.
+4. Removes `*.d.ts`, `*.d.mts`, `*.d.cts`, `*.map` and `*.md` from `node_modules` (never
+   executed; about half of the size: 243 MB → 104 MB) and fails if the result is over a
+   200 MB budget (Lambda allows 250 MB unzipped, layers included).
+5. Zips it inside a Linux container (`alpine` from ECR Public), because zips made on Windows do
+   not keep the executable bit that `run.sh` needs. CDK uploads the zip as-is.
+
+The ZIP path is shared through `infra/lambda-package.json`. esbuild bundling is not used because
+NestJS needs `emitDecoratorMetadata`, which esbuild does not support. `@nestjs/swagger` declares
+`typescript` as a production dependency, which accounts for 23 MB of the package.
 
 ## Secrets
 
