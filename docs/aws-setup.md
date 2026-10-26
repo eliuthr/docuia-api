@@ -1,5 +1,7 @@
 # Deploying DocuIA to AWS
 
+> Spanish version: [`aws-setup.es.md`](aws-setup.es.md). Keep both in sync.
+
 This guide takes a new AWS account to a working DocuIA API on Lambda. Everything it creates fits
 in the AWS free tier; the only real cost is the OpenAI API. Read it once before starting.
 
