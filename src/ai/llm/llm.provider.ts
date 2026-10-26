@@ -9,8 +9,8 @@ export type LlmInput =
   | { kind: 'image'; mimeType: string; content: Buffer };
 
 export interface StructuredRequest {
-  /** Id del documento; solo se usa en los logs. */
-  documentId: string;
+  /** Datos para los logs (documentId, endpoint); nunca el contenido. */
+  logContext: Record<string, string>;
   /** Prompt de sistema, tomado de `src/ai/prompts`. */
   instructions: string;
   input: LlmInput;

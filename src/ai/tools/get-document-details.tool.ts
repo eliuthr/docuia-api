@@ -5,6 +5,7 @@ import {
   DOCUMENT_NOT_FOUND_RESULT,
   ReadyDocumentFinder,
 } from './ready-document-finder.js';
+import { ToolName } from './tool-name.js';
 
 const inputSchema = z.object({ documentId: z.string() });
 
@@ -12,7 +13,7 @@ type GetDocumentDetailsInput = z.infer<typeof inputSchema>;
 
 @Injectable()
 export class GetDocumentDetailsTool implements LlmTool<GetDocumentDetailsInput> {
-  readonly name = 'get_document_details';
+  readonly name = ToolName.GetDocumentDetails;
   readonly description =
     'Returns the type, summary and all the structured data extracted from one document ' +
     '(for example an invoice with vendor, dates, line items and totals). ' +

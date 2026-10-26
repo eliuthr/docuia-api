@@ -1,6 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 export const MAX_QUESTION_LENGTH = 1000;
 
@@ -16,4 +22,13 @@ export class AskQuestionDto {
   @IsNotEmpty()
   @MaxLength(MAX_QUESTION_LENGTH)
   question: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Continue this conversation (the id sent in the `conversation` event); omit it to start a new one',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  conversationId?: string;
 }

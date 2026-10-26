@@ -59,7 +59,7 @@ export class DocumentDataExtractorService {
   ): Promise<ExtractedData> {
     const { instructions, schema } = EXTRACTION_SPECS[documentType];
     return this.structuredOutput.generate({
-      documentId,
+      logContext: { documentId },
       instructions,
       input: truncateInput(input, this.maxInputChars),
       schemaName: documentType,

@@ -39,6 +39,12 @@ describe('ToolRegistry', () => {
     ]);
   });
 
+  it('describes only the requested tools when names are given', () => {
+    expect(registry.definitions(['get_document_details'])).toHaveLength(1);
+    expect(registry.definitions(['find_documents'])).toEqual([]);
+    expect(registry.definitions([])).toEqual([]);
+  });
+
   it('runs the tool with the validated input and returns JSON', async () => {
     await expect(
       registry.execute('get_document_details', '{"documentId":"doc-1"}'),

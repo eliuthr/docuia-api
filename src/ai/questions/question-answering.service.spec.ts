@@ -1,37 +1,59 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { buildDocument } from '../../../test/support/build-document.js';
+import { ConversationsService } from '../../conversations/conversations.service.js';
+import {
+  COLLECTION_SCOPE,
+  documentScope,
+} from '../../conversations/domain/conversation-scope.js';
 import { DocumentStatus } from '../../documents/domain/document-status.enum.js';
 import { DocumentRepository } from '../../documents/repositories/document.repository.js';
 import { ANSWER_COLLECTION_QUESTION_PROMPT } from '../prompts/answer-collection-question.prompt.js';
+import { ConversationAnswerService } from './conversation-answer.service.js';
 import { QuestionAnsweringService } from './question-answering.service.js';
-import { ToolLoopService } from './tool-loop.service.js';
 
 const QUESTION = '¿Cuál es el total?';
 
 describe('QuestionAnsweringService', () => {
   let findById: ReturnType<typeof vi.fn>;
-  let run: ReturnType<typeof vi.fn>;
+  let openForQuestion: ReturnType<typeof vi.fn>;
+  let answer: ReturnType<typeof vi.fn>;
   let service: QuestionAnsweringService;
   const signal = new AbortController().signal;
 
   beforeEach(() => {
     findById = vi.fn().mockResolvedValue(buildDocument());
-    run = vi.fn().mockReturnValue('answer-stream');
+    openForQuestion = vi.fn().mockResolvedValue({ id: 'conv-1' });
+    answer = vi.fn().mockReturnValue('answer-stream');
     service = new QuestionAnsweringService(
       { findById } as unknown as DocumentRepository,
-      { run } as unknown as ToolLoopService,
+      { openForQuestion } as unknown as ConversationsService,
+      { answer } as unknown as ConversationAnswerService,
     );
   });
 
   describe('answerAboutDocument', () => {
-    it('runs the tool loop with a prompt that names the document', async () => {
+    it('answers in a document conversation with a prompt that names the document', async () => {
       await expect(
-        service.answerAboutDocument('doc-1', QUESTION, signal),
+        service.answerAboutDocument(
+          'doc-1',
+          { question: QUESTION, conversationId: 'conv-1' },
+          signal,
+        ),
       ).resolves.toBe('answer-stream');
 
-      const [request] = run.mock.calls[0] as [{ instructions: string }];
+      expect(openForQuestion).toHaveBeenCalledWith(
+        documentScope('doc-1'),
+        QUESTION,
+        'conv-1',
+      );
+      const [request] = answer.mock.calls[0] as [{ instructions: string }];
       expect(request).toMatchObject({
-        logContext: { endpoint: 'documents.ask', documentId: 'doc-1' },
+        conversationId: 'conv-1',
+        logContext: {
+          endpoint: 'documents.ask',
+          documentId: 'doc-1',
+          conversationId: 'conv-1',
+        },
         question: QUESTION,
         signal,
       });
@@ -43,9 +65,10 @@ describe('QuestionAnsweringService', () => {
       findById.mockResolvedValue(null);
 
       await expect(
-        service.answerAboutDocument('doc-9', QUESTION, signal),
+        service.answerAboutDocument('doc-9', { question: QUESTION }, signal),
       ).rejects.toBeInstanceOf(NotFoundException);
-      expect(run).not.toHaveBeenCalled();
+      expect(openForQuestion).not.toHaveBeenCalled();
+      expect(answer).not.toHaveBeenCalled();
     });
 
     it('throws ConflictException for a document that is not ready', async () => {
@@ -54,17 +77,36 @@ describe('QuestionAnsweringService', () => {
       );
 
       await expect(
-        service.answerAboutDocument('doc-1', QUESTION, signal),
+        service.answerAboutDocument('doc-1', { question: QUESTION }, signal),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rejects before streaming when the conversation cannot be continued', async () => {
+      openForQuestion.mockRejectedValue(new NotFoundException());
+
+      await expect(
+        service.answerAboutDocument(
+          'doc-1',
+          { question: QUESTION, conversationId: 'conv-9' },
+          signal,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(answer).not.toHaveBeenCalled();
     });
   });
 
   describe('answerAboutCollection', () => {
-    it('runs the tool loop with the collection prompt', () => {
-      service.answerAboutCollection(QUESTION, signal);
+    it('answers in a collection conversation with the collection prompt', async () => {
+      await service.answerAboutCollection({ question: QUESTION }, signal);
 
-      expect(run).toHaveBeenCalledWith({
-        logContext: { endpoint: 'ask' },
+      expect(openForQuestion).toHaveBeenCalledWith(
+        COLLECTION_SCOPE,
+        QUESTION,
+        undefined,
+      );
+      expect(answer).toHaveBeenCalledWith({
+        conversationId: 'conv-1',
+        logContext: { endpoint: 'ask', conversationId: 'conv-1' },
         instructions: ANSWER_COLLECTION_QUESTION_PROMPT,
         question: QUESTION,
         signal,

@@ -19,8 +19,12 @@ export class ToolRegistry {
     this.toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
   }
 
-  definitions(): ToolDefinition[] {
-    return [...this.toolsByName.values()].map((tool) => ({
+  /** Las definiciones que ve el modelo; con `names`, solo las de esas herramientas. */
+  definitions(names?: readonly string[]): ToolDefinition[] {
+    const tools = [...this.toolsByName.values()].filter(
+      (tool) => !names || names.includes(tool.name),
+    );
+    return tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
       parameters: toJsonSchema(tool.inputSchema),

@@ -26,7 +26,7 @@ export class DocumentOverviewService {
 
   describe(documentId: string, input: LlmInput): Promise<DocumentOverview> {
     return this.structuredOutput.generate({
-      documentId,
+      logContext: { documentId },
       instructions: DOCUMENT_OVERVIEW_PROMPT,
       input: truncateInput(input, this.maxInputChars),
       schemaName: 'document_overview',

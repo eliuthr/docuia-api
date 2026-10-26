@@ -34,7 +34,7 @@ export class StructuredOutputService {
       }
       this.logger.warn({
         event: 'llm.response.invalid',
-        documentId: request.documentId,
+        ...request.logContext,
         schemaName: request.schemaName,
         attempt,
       });

@@ -7,6 +7,7 @@ import {
   DOCUMENT_NOT_FOUND_RESULT,
   ReadyDocumentFinder,
 } from './ready-document-finder.js';
+import { ToolName } from './tool-name.js';
 
 const MAX_PASSAGES = 5;
 
@@ -19,7 +20,7 @@ type SearchDocumentTextInput = z.infer<typeof inputSchema>;
 
 @Injectable()
 export class SearchDocumentTextTool implements LlmTool<SearchDocumentTextInput> {
-  readonly name = 'search_document_text';
+  readonly name = ToolName.SearchDocumentText;
   readonly description =
     'Searches the full text of one document by keywords and returns the passages that ' +
     'match the most words. Use it for details that are not in the extracted data, such as ' +

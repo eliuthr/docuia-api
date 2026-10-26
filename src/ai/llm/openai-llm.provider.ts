@@ -52,7 +52,7 @@ export class OpenAiLlmProvider extends LlmProvider {
       }),
     );
     this.logResponse(
-      { documentId: request.documentId, schemaName: request.schemaName },
+      { ...request.logContext, schemaName: request.schemaName },
       response,
     );
     return response.output_text;

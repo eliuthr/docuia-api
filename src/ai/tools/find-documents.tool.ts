@@ -5,6 +5,7 @@ import { DocumentRepository } from '../../documents/repositories/document.reposi
 import { DocumentType } from '../schemas/document-type.js';
 import { keyFieldsOf } from './document-key-fields.js';
 import { LlmTool } from './llm-tool.js';
+import { ToolName } from './tool-name.js';
 
 const MAX_RESULTS = 20;
 
@@ -18,7 +19,7 @@ type FindDocumentsInput = z.infer<typeof inputSchema>;
 
 @Injectable()
 export class FindDocumentsTool implements LlmTool<FindDocumentsInput> {
-  readonly name = 'find_documents';
+  readonly name = ToolName.FindDocuments;
   readonly description =
     'Lists processed documents, newest first, with their summary and key fields ' +
     '(vendor and total for invoices, parties and value for contracts, name for résumés). ' +

@@ -14,7 +14,7 @@ function buildRequest(
   overrides: Partial<StructuredRequest> = {},
 ): StructuredRequest {
   return {
-    documentId: 'doc-1',
+    logContext: { documentId: 'doc-1' },
     instructions: 'Extract the invoice.',
     input: { kind: 'text', text: 'Total 150' },
     schemaName: 'invoice',

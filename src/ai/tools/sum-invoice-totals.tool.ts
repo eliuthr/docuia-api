@@ -5,6 +5,7 @@ import { DocumentType } from '../schemas/document-type.js';
 import { InvoiceData } from '../schemas/invoice.schema.js';
 import { LlmTool } from './llm-tool.js';
 import { ReadyDocumentFinder } from './ready-document-finder.js';
+import { ToolName } from './tool-name.js';
 
 const MAX_INVOICES = 50;
 const UNKNOWN_CURRENCY = 'UNKNOWN';
@@ -25,7 +26,7 @@ interface CurrencyTotal {
 
 @Injectable()
 export class SumInvoiceTotalsTool implements LlmTool<SumInvoiceTotalsInput> {
-  readonly name = 'sum_invoice_totals';
+  readonly name = ToolName.SumInvoiceTotals;
   readonly description =
     'Adds up the totals of the given invoices, grouped by currency. Always use it instead ' +
     'of adding numbers yourself. It also lists ids that were not found, are not invoices ' +

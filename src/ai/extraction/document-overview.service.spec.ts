@@ -35,7 +35,7 @@ describe('DocumentOverviewService', () => {
 
     expect(generate).toHaveBeenCalledWith(
       expect.objectContaining({
-        documentId: 'doc-1',
+        logContext: { documentId: 'doc-1' },
         instructions: DOCUMENT_OVERVIEW_PROMPT,
         schema: documentOverviewSchema,
       }),

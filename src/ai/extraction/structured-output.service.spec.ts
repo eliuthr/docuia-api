@@ -10,7 +10,7 @@ import {
 const totalSchema = z.object({ total: z.number() });
 
 const request: StructuredOutputRequest<z.infer<typeof totalSchema>> = {
-  documentId: 'doc-1',
+  logContext: { documentId: 'doc-1' },
   instructions: 'Extract the total.',
   input: { kind: 'text', text: 'Total 150' },
   schemaName: 'total',
@@ -39,7 +39,7 @@ describe('StructuredOutputService', () => {
     await service.generate(request);
 
     expect(generateJson).toHaveBeenCalledWith({
-      documentId: 'doc-1',
+      logContext: { documentId: 'doc-1' },
       instructions: 'Extract the total.',
       input: { kind: 'text', text: 'Total 150' },
       schemaName: 'total',
