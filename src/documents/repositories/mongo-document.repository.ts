@@ -6,9 +6,15 @@ import {
   DocumentEntity,
   NewDocument,
 } from '../domain/document.entity.js';
+import {
+  DocumentPage,
+  DocumentPageRequest,
+  toDocumentPage,
+} from '../domain/document-page.js';
 import { DocumentSearchCriteria } from '../domain/document-search-criteria.js';
 import { DocumentRecord } from '../schemas/document-record.schema.js';
 import { DocumentRepository } from './document.repository.js';
+import { buildCursorFilter, PAGE_SORT } from './mongo-cursor-filter.js';
 import { buildSearchFilter } from './mongo-search-filter.js';
 
 @Injectable()
@@ -31,14 +37,15 @@ export class MongoDocumentRepository extends DocumentRepository {
     return record ? toEntity(record) : null;
   }
 
-  async findRecent(limit: number): Promise<DocumentEntity[]> {
+  async findPage(request: DocumentPageRequest): Promise<DocumentPage> {
+    // Se pide uno de más para saber si existe una página siguiente.
     const records = await this.model
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(limit)
+      .find(buildCursorFilter(request.after))
+      .sort(PAGE_SORT)
+      .limit(request.limit + 1)
       .lean<DocumentRecord[]>()
       .exec();
-    return records.map(toEntity);
+    return toDocumentPage(records.map(toEntity), request.limit);
   }
 
   async search(criteria: DocumentSearchCriteria): Promise<DocumentEntity[]> {

@@ -31,7 +31,7 @@ npm run start:worker:dev  # worker (terminal 2)
 | ------ | -------------------- | ---------------------------------------------- |
 | GET    | `/health`            | Liveness check                                 |
 | POST   | `/documents`         | Upload a PDF, PNG or JPEG (`file` form field)  |
-| GET    | `/documents`         | List recent documents (`?limit=1..100`)        |
+| GET    | `/documents`         | Page of documents (`?limit=1..100&cursor=`)    |
 | GET    | `/documents/events`  | Stream status changes (SSE)                    |
 | GET    | `/documents/:id`     | Get a document and its processing status       |
 | POST   | `/documents/:id/ask` | Ask about one document (SSE stream)            |

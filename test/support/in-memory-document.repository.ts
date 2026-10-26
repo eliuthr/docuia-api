@@ -4,6 +4,12 @@ import {
   DocumentEntity,
   NewDocument,
 } from '../../src/documents/domain/document.entity.js';
+import {
+  DocumentPage,
+  DocumentPageCursor,
+  DocumentPageRequest,
+  toDocumentPage,
+} from '../../src/documents/domain/document-page.js';
 import { DocumentSearchCriteria } from '../../src/documents/domain/document-search-criteria.js';
 import { DocumentRepository } from '../../src/documents/repositories/document.repository.js';
 
@@ -21,9 +27,13 @@ export class InMemoryDocumentRepository extends DocumentRepository {
     return Promise.resolve(this.documents.get(id) ?? null);
   }
 
-  findRecent(limit: number): Promise<DocumentEntity[]> {
-    const newestFirst = [...this.documents.values()].reverse();
-    return Promise.resolve(newestFirst.slice(0, limit));
+  findPage(request: DocumentPageRequest): Promise<DocumentPage> {
+    const sorted = [...this.documents.values()]
+      .sort(newestFirst)
+      .filter((document) => isAfter(document, request.after));
+    return Promise.resolve(
+      toDocumentPage(sorted.slice(0, request.limit + 1), request.limit),
+    );
   }
 
   search(criteria: DocumentSearchCriteria): Promise<DocumentEntity[]> {
@@ -47,6 +57,26 @@ export class InMemoryDocumentRepository extends DocumentRepository {
     this.documents.delete(id);
     return Promise.resolve();
   }
+}
+
+/**
+ * Mismo orden que Mongo: createdAt descendente y, si empatan, id descendente.
+ * Negativo si `first` va antes que `second`.
+ */
+function newestFirst(
+  first: DocumentPageCursor,
+  second: DocumentPageCursor,
+): number {
+  const byDate = second.createdAt.getTime() - first.createdAt.getTime();
+  return byDate !== 0 ? byDate : second.id.localeCompare(first.id);
+}
+
+/** true si el documento va después del cursor en ese orden. */
+function isAfter(
+  document: DocumentEntity,
+  cursor: DocumentPageCursor | null,
+): boolean {
+  return cursor === null || newestFirst(cursor, document) < 0;
 }
 
 /** Versión simplificada del filtro de Mongo: busca el texto en todo el documento. */

@@ -10,6 +10,7 @@ import { DocumentStatus } from './domain/document-status.enum.js';
 import { DocumentEntity, NewDocument } from './domain/document.entity.js';
 import { UploadedDocumentFile } from './domain/uploaded-document-file.js';
 import { DocumentsService } from './documents.service.js';
+import { documentCursorCodec } from './pagination/document-cursor.codec.js';
 import { DocumentRepository } from './repositories/document.repository.js';
 
 const UUID_PATTERN =
@@ -35,7 +36,7 @@ describe('DocumentsService', () => {
   let repository: {
     create: ReturnType<typeof vi.fn>;
     findById: ReturnType<typeof vi.fn>;
-    findRecent: ReturnType<typeof vi.fn>;
+    findPage: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
   let queue: { enqueue: ReturnType<typeof vi.fn> };
@@ -52,7 +53,7 @@ describe('DocumentsService', () => {
         Promise.resolve(toEntity(document)),
       ),
       findById: vi.fn(),
-      findRecent: vi.fn(),
+      findPage: vi.fn(),
       delete: vi.fn().mockResolvedValue(undefined),
     };
     queue = { enqueue: vi.fn().mockResolvedValue(undefined) };
@@ -166,13 +167,53 @@ describe('DocumentsService', () => {
     });
   });
 
-  describe('findRecent', () => {
-    it('delegates the limit to the repository', async () => {
-      repository.findRecent.mockResolvedValue([]);
+  describe('findPage', () => {
+    const cursor = {
+      createdAt: new Date('2026-10-24T13:00:00.000Z'),
+      id: 'doc-7',
+    };
 
-      await service.findRecent(5);
+    it('requests the first page without a cursor', async () => {
+      repository.findPage.mockResolvedValue({
+        documents: [],
+        nextCursor: null,
+      });
 
-      expect(repository.findRecent).toHaveBeenCalledWith(5);
+      await expect(service.findPage(10)).resolves.toEqual({
+        documents: [],
+        nextCursor: null,
+      });
+      expect(repository.findPage).toHaveBeenCalledWith({
+        limit: 10,
+        after: null,
+      });
+    });
+
+    it('decodes the cursor and encodes the next one', async () => {
+      repository.findPage.mockResolvedValue({
+        documents: [],
+        nextCursor: cursor,
+      });
+
+      const listed = await service.findPage(
+        5,
+        documentCursorCodec.encode(cursor),
+      );
+
+      expect(repository.findPage).toHaveBeenCalledWith({
+        limit: 5,
+        after: cursor,
+      });
+      expect(documentCursorCodec.decode(listed.nextCursor ?? '')).toEqual(
+        cursor,
+      );
+    });
+
+    it('rejects a malformed cursor with BadRequestException', async () => {
+      await expect(service.findPage(10, 'garbage')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(repository.findPage).not.toHaveBeenCalled();
     });
   });
 });

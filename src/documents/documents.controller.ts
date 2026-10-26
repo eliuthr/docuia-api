@@ -28,6 +28,7 @@ import { Observable } from 'rxjs';
 import { documentFileValidationPipe } from './pipes/document-file-validation.pipe.js';
 import { UPLOAD_FIELD_NAME } from './documents.constants.js';
 import { DocumentsService } from './documents.service.js';
+import { DocumentPageResponseDto } from './dto/document-page-response.dto.js';
 import { DocumentResponseDto } from './dto/document-response.dto.js';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto.js';
 import { UploadDocumentDto } from './dto/upload-document.dto.js';
@@ -61,16 +62,20 @@ export class DocumentsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List the most recent documents' })
-  @ApiOkResponse({ type: [DocumentResponseDto] })
-  @ApiBadRequestResponse({ description: 'Invalid limit' })
-  async findRecent(
+  @ApiOperation({
+    summary:
+      'List documents, newest first, one page at a time (cursor pagination)',
+  })
+  @ApiOkResponse({ type: DocumentPageResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid limit or cursor' })
+  async findPage(
     @Query() query: ListDocumentsQueryDto,
-  ): Promise<DocumentResponseDto[]> {
-    const documents = await this.documentsService.findRecent(query.limit);
-    return documents.map((document) =>
-      DocumentResponseDto.fromEntity(document),
+  ): Promise<DocumentPageResponseDto> {
+    const listed = await this.documentsService.findPage(
+      query.limit,
+      query.cursor,
     );
+    return DocumentPageResponseDto.fromListed(listed);
   }
 
   // Va antes de `@Get(':id')`: si no, Express tomaría "events" como un id.

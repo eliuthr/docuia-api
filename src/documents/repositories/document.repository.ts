@@ -3,6 +3,7 @@ import {
   DocumentEntity,
   NewDocument,
 } from '../domain/document.entity.js';
+import { DocumentPage, DocumentPageRequest } from '../domain/document-page.js';
 import { DocumentSearchCriteria } from '../domain/document-search-criteria.js';
 
 /**
@@ -12,7 +13,8 @@ import { DocumentSearchCriteria } from '../domain/document-search-criteria.js';
 export abstract class DocumentRepository {
   abstract create(document: NewDocument): Promise<DocumentEntity>;
   abstract findById(id: string): Promise<DocumentEntity | null>;
-  abstract findRecent(limit: number): Promise<DocumentEntity[]>;
+  /** Una página de documentos, del más reciente al más antiguo (paginación por cursor). */
+  abstract findPage(request: DocumentPageRequest): Promise<DocumentPage>;
   /** Documentos que cumplen los criterios, del más reciente al más antiguo. */
   abstract search(criteria: DocumentSearchCriteria): Promise<DocumentEntity[]>;
   /** Devuelve el documento actualizado, o null si no existe. */

@@ -1,7 +1,10 @@
 import { INestApplication } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { readdir, rm } from 'node:fs/promises';
 import request from 'supertest';
+import { DocumentRepository } from '../src/documents/repositories/document.repository.js';
 import { QueueProvider } from '../src/processing/queue/queue.provider.js';
+import { buildDocument } from './support/build-document.js';
 import { createTestApp } from './support/create-test-app.js';
 import { InMemoryQueueProvider } from './support/in-memory-queue.provider.js';
 
@@ -157,16 +160,59 @@ describe('Documents (e2e)', () => {
   });
 
   describe('GET /documents', () => {
+    interface PageBody {
+      items: { id: string }[];
+      nextCursor: string | null;
+    }
+
+    async function getPage(query: string): Promise<PageBody> {
+      const response = await request(app.getHttpServer())
+        .get(`/documents?${query}`)
+        .expect(200);
+      return response.body as PageBody;
+    }
+
     it('lists documents newest first, honoring the limit', async () => {
       const latest = await request(app.getHttpServer())
         .post('/documents')
         .attach('file', MINIMAL_PDF, 'latest.pdf');
 
-      const response = await request(app.getHttpServer())
-        .get('/documents?limit=1')
-        .expect(200);
+      const page = await getPage('limit=1');
 
-      expect(response.body).toEqual([latest.body]);
+      expect(page.items).toEqual([latest.body]);
+      expect(page.nextCursor).toEqual(expect.any(String));
+    });
+
+    it('walks every page with no duplicates or gaps', async () => {
+      // Se crean de golpe, así que varios comparten el mismo milisegundo y
+      // el orden depende del desempate por id.
+      const repository = app.get(DocumentRepository);
+      const created = await Promise.all(
+        Array.from({ length: 25 }, () =>
+          repository.create(buildDocument({ id: randomUUID() })),
+        ),
+      );
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      do {
+        const query = cursor ? `limit=10&cursor=${cursor}` : 'limit=10';
+        const page = await getPage(query);
+        expect(page.items.length).toBeLessThanOrEqual(10);
+        seen.push(...page.items.map((item) => item.id));
+        cursor = page.nextCursor;
+      } while (cursor);
+
+      expect(new Set(seen).size).toBe(seen.length);
+      expect(seen).toEqual(
+        expect.arrayContaining(created.map((doc) => doc.id)),
+      );
+    });
+
+    it('responds 400 for a malformed cursor', async () => {
+      await request(app.getHttpServer())
+        .get('/documents?cursor=not-a-cursor')
+        .expect(400);
     });
 
     it.each(['0', '101', 'abc'])('rejects limit=%s', async (limit) => {

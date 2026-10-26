@@ -48,4 +48,5 @@ export class DocumentRecord {
 
 export const DocumentRecordSchema =
   SchemaFactory.createForClass(DocumentRecord);
-DocumentRecordSchema.index({ createdAt: -1 });
+// Coincide con el orden de la lista paginada (ver mongo-cursor-filter.ts).
+DocumentRecordSchema.index({ createdAt: -1, _id: -1 });

@@ -8,11 +8,18 @@ import {
 import { randomUUID } from 'node:crypto';
 import { QueueProvider } from '../processing/queue/queue.provider.js';
 import { StorageProvider } from '../storage/storage.provider.js';
+import { DocumentPageCursor } from './domain/document-page.js';
 import { DocumentStatus } from './domain/document-status.enum.js';
 import { DocumentEntity, NewDocument } from './domain/document.entity.js';
 import { UploadedDocumentFile } from './domain/uploaded-document-file.js';
 import { FILE_EXTENSION_BY_MIME_TYPE } from './documents.constants.js';
+import { documentCursorCodec } from './pagination/document-cursor.codec.js';
 import { DocumentRepository } from './repositories/document.repository.js';
+
+export interface ListedDocuments {
+  documents: DocumentEntity[];
+  nextCursor: string | null;
+}
 
 @Injectable()
 export class DocumentsService {
@@ -42,8 +49,16 @@ export class DocumentsService {
     return document;
   }
 
-  findRecent(limit: number): Promise<DocumentEntity[]> {
-    return this.repository.findRecent(limit);
+  /** Una página de la lista; `cursor` es el `nextCursor` opaco de la página anterior. */
+  async findPage(limit: number, cursor?: string): Promise<ListedDocuments> {
+    const after = cursor ? decodeCursorOrThrow(cursor) : null;
+    const page = await this.repository.findPage({ limit, after });
+    return {
+      documents: page.documents,
+      nextCursor: page.nextCursor
+        ? documentCursorCodec.encode(page.nextCursor)
+        : null,
+    };
   }
 
   private async createOrDiscardFile(
@@ -74,6 +89,14 @@ export class DocumentsService {
       );
     }
   }
+}
+
+function decodeCursorOrThrow(cursor: string): DocumentPageCursor {
+  const decoded = documentCursorCodec.decode(cursor);
+  if (!decoded) {
+    throw new BadRequestException('Invalid cursor');
+  }
+  return decoded;
 }
 
 function buildNewDocument(file: UploadedDocumentFile): NewDocument {
