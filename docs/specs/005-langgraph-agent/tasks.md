@@ -21,7 +21,7 @@
       `done` + tests. (US-3, US-5)
 - [x] **T10** e2e with the scripted fake LLM (classification, tools, verification) and the
       in-memory conversation repository; README; lint, tests, e2e, build.
-- [ ] **T11** Manual run with the real API and the sample documents.
+- [x] **T11** Manual run with the real API and the sample documents.
 
 ## Verification log
 
@@ -32,6 +32,28 @@
 - `QuestionAgentService` is tested with the real compiled graph and real nodes (only the LLM,
   structured output and tools are fakes): conversational path, tools + verification, history
   order, one revision, tool-free last turn, abort.
+- Manual run against the real OpenAI API (`gpt-6-luna`), Docker MongoDB + Redis, with the
+  documents already processed in earlier phases:
+  - `POST /ask` "How much do all my invoices add up to, by currency?" → `classifying`,
+    `answering`, `find_documents → sum_invoice_totals`, `verifying`, one `delta`, `done`;
+    8.067.375 COP, 150 USD and 43.000 with no currency, matching the hand-calculated totals
+    (the duplicated sample uploads are counted, and the answer says so).
+  - Follow-up in the same conversation, "And how much of that is from Tecnosuministros?" →
+    7.916.475 COP (three copies of the same invoice); only answerable with the history.
+  - "Thanks!" in the same conversation → conversational path: no tools, no verification,
+    streamed in four `delta` events.
+  - Contract: "How is it paid, and is there an employment relationship?" →
+    `get_document_details → search_document_text`; 40 % on signing, 60 % on delivery, civil
+    contract with no employment relationship.
+  - Résumé: "What is the candidate's expected salary?" → said it is not in the document.
+  - `GET /conversations`, `GET /conversations?documentId=` and `GET /conversations/:id` list the
+    conversations with the right scope and messages, oldest first.
+  - Accented questions sent with `curl -d` from Git Bash on Windows were stored with `�`: the
+    shell sent them in a non-UTF-8 encoding. The same question sent as a UTF-8 file was stored
+    correctly, so the API is not affected.
+- Covered by unit/e2e tests only: a revision after an `unsupported` verdict, the classification
+  and verification fallbacks, the tool-free last turn, abort on client disconnect, `404`/`400`/
+  `409` for conversations.
 - Implementation notes:
   - `npm audit` reports advisories in `multer` (via NestJS) and `undici` (via `openai`); they were
     there before this spec and do not come from LangGraph.
