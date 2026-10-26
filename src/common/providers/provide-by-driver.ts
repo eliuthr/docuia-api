@@ -4,7 +4,7 @@ import { ModuleRef } from '@nestjs/core';
 import { Env } from '../../config/env.schema.js';
 
 type DriverKey = {
-  [Key in keyof Env]: Env[Key] extends string ? Key : never;
+  [Key in keyof Env]-?: Env[Key] extends string ? Key : never;
 }[keyof Env];
 
 /**

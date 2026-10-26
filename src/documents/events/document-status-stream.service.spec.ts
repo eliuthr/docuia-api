@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Subject } from 'rxjs';
 import { Env } from '../../config/env.schema.js';
@@ -5,6 +6,7 @@ import { DocumentStatus } from '../domain/document-status.enum.js';
 import { DocumentEventsSubscriber } from './document-events.subscriber.js';
 import { DocumentStatusEvent } from './document-status-event.js';
 import { DocumentStatusStreamService } from './document-status-stream.service.js';
+import { UnavailableDocumentEventsSubscriber } from './unavailable-document-events.subscriber.js';
 
 const HEARTBEAT_MS = 1000;
 
@@ -68,5 +70,14 @@ describe('DocumentStatusStreamService', () => {
     vi.advanceTimersByTime(HEARTBEAT_MS * 3);
 
     expect(received).toEqual([]);
+  });
+
+  it('responds 503 before streaming when live events are unavailable', () => {
+    const unavailable = new DocumentStatusStreamService(
+      new UnavailableDocumentEventsSubscriber(),
+      { get: () => HEARTBEAT_MS } as unknown as ConfigService<Env, true>,
+    );
+
+    expect(() => unavailable.stream()).toThrow(ServiceUnavailableException);
   });
 });

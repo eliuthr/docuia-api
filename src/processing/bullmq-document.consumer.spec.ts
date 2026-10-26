@@ -1,12 +1,8 @@
-import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, UnrecoverableError } from 'bullmq';
 import { Env } from '../config/env.schema.js';
 import { BullmqDocumentConsumer } from './bullmq-document.consumer.js';
-import { DocumentProcessingService } from './document-processing.service.js';
-import { DataExtractionFailedError } from './errors/data-extraction-failed.error.js';
-import { GENERIC_FAILURE_REASON } from './errors/permanent-processing.error.js';
-import { UnreadableDocumentError } from './errors/unreadable-document.error.js';
+import { DocumentJobRunner } from './document-job.runner.js';
 import { DocumentJob } from './queue/document-job.js';
 
 const MAX_ATTEMPTS = 3;
@@ -20,80 +16,39 @@ function buildJob(attemptsMade: number): Job<DocumentJob> {
 }
 
 describe('BullmqDocumentConsumer', () => {
-  let processing: {
-    process: ReturnType<typeof vi.fn>;
-    markFailed: ReturnType<typeof vi.fn>;
-  };
+  let run: ReturnType<typeof vi.fn>;
   let consumer: BullmqDocumentConsumer;
 
   beforeEach(() => {
-    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
-    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    processing = {
-      process: vi.fn().mockResolvedValue(undefined),
-      markFailed: vi.fn().mockResolvedValue(undefined),
-    };
+    run = vi.fn().mockResolvedValue({ kind: 'done' });
     consumer = new BullmqDocumentConsumer(
-      processing as unknown as DocumentProcessingService,
+      { run } as unknown as DocumentJobRunner,
       {} as ConfigService<Env, true>,
     );
   });
 
-  it('processes the document of the job', async () => {
-    await consumer.process(buildJob(0));
+  it('runs the job with the BullMQ attempt number', async () => {
+    await consumer.process(buildJob(1));
 
-    expect(processing.process).toHaveBeenCalledWith('doc-1');
+    expect(run).toHaveBeenCalledWith({
+      documentId: 'doc-1',
+      attempt: 2,
+      maxAttempts: MAX_ATTEMPTS,
+    });
   });
 
-  it('rethrows a transient error so BullMQ retries it', async () => {
+  it('rethrows the error so BullMQ retries the job', async () => {
     const failure = new Error('storage timeout');
-    processing.process.mockRejectedValue(failure);
+    run.mockResolvedValue({ kind: 'retry', error: failure });
 
     await expect(consumer.process(buildJob(0))).rejects.toBe(failure);
-
-    expect(processing.markFailed).not.toHaveBeenCalled();
   });
 
-  it('marks the document failed on the last attempt with a generic reason', async () => {
-    processing.process.mockRejectedValue(new Error('storage timeout'));
-
-    await expect(
-      consumer.process(buildJob(MAX_ATTEMPTS - 1)),
-    ).rejects.toBeInstanceOf(UnrecoverableError);
-
-    expect(processing.markFailed).toHaveBeenCalledWith(
-      'doc-1',
-      GENERIC_FAILURE_REASON,
-    );
-  });
-
-  it('fails an unreadable document immediately with its own reason', async () => {
-    processing.process.mockRejectedValue(
-      new UnreadableDocumentError('The PDF file is corrupt or cannot be read.'),
-    );
+  it('stops BullMQ retries once the document failed', async () => {
+    run.mockResolvedValue({ kind: 'failed', message: 'corrupt PDF' });
 
     await expect(consumer.process(buildJob(0))).rejects.toBeInstanceOf(
       UnrecoverableError,
-    );
-
-    expect(processing.markFailed).toHaveBeenCalledWith(
-      'doc-1',
-      'The PDF file is corrupt or cannot be read.',
-    );
-  });
-
-  it('fails a data extraction error immediately with a user-safe reason', async () => {
-    processing.process.mockRejectedValue(
-      new DataExtractionFailedError(new Error('invalid LLM output')),
-    );
-
-    await expect(consumer.process(buildJob(0))).rejects.toBeInstanceOf(
-      UnrecoverableError,
-    );
-
-    expect(processing.markFailed).toHaveBeenCalledWith(
-      'doc-1',
-      'The document data could not be extracted. Try again later.',
     );
   });
 });

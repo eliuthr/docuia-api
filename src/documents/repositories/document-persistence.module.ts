@@ -1,21 +1,15 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import {
-  DocumentRecord,
-  DocumentRecordSchema,
-} from '../schemas/document-record.schema.js';
-import { DocumentRepository } from './document.repository.js';
-import { MongoDocumentRepository } from './mongo-document.repository.js';
+import { importForDriver } from '../../common/modules/import-for-driver.js';
+import { DynamoDbDocumentPersistenceModule } from './dynamodb-document-persistence.module.js';
+import { MongoDocumentPersistenceModule } from './mongo-document-persistence.module.js';
 
+/** Da acceso a `DocumentRepository` con la implementación de DATABASE_DRIVER. */
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: DocumentRecord.name, schema: DocumentRecordSchema },
-    ]),
+    ...importForDriver('DATABASE_DRIVER', {
+      mongodb: MongoDocumentPersistenceModule,
+      dynamodb: DynamoDbDocumentPersistenceModule,
+    }),
   ],
-  providers: [
-    { provide: DocumentRepository, useClass: MongoDocumentRepository },
-  ],
-  exports: [DocumentRepository],
 })
 export class DocumentPersistenceModule {}

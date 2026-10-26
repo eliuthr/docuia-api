@@ -12,7 +12,10 @@ describe('validateEnv', () => {
       NODE_ENV: 'development',
       PORT: 3000,
       CORS_ORIGIN: 'http://localhost:4200',
+      LOG_FORMAT: 'pretty',
+      DATABASE_DRIVER: 'mongodb',
       MONGODB_URI,
+      AWS_REGION: 'us-east-1',
       STORAGE_DRIVER: 'local',
       LOCAL_STORAGE_DIR: './uploads',
       MAX_UPLOAD_SIZE_MB: 10,
@@ -51,7 +54,7 @@ describe('validateEnv', () => {
   });
 
   it('names the missing variable when a required one is absent', () => {
-    expect(() => validateEnv({})).toThrow(/MONGODB_URI/);
+    expect(() => validateEnv({ OPENAI_API_KEY })).toThrow(/MONGODB_URI/);
   });
 
   it('requires the OpenAI API key', () => {
@@ -86,6 +89,48 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...REQUIRED, STORAGE_DRIVER: 'ftp' })).toThrow(
       /STORAGE_DRIVER/,
     );
+  });
+
+  describe('driver requirements', () => {
+    const AWS_ENV = {
+      OPENAI_API_KEY,
+      DATABASE_DRIVER: 'dynamodb',
+      DYNAMODB_DOCUMENTS_TABLE: 'docuia-documents',
+      DYNAMODB_CONVERSATIONS_TABLE: 'docuia-conversations',
+      DYNAMODB_MESSAGES_TABLE: 'docuia-messages',
+      STORAGE_DRIVER: 's3',
+      S3_BUCKET: 'docuia-files',
+      QUEUE_DRIVER: 'sqs',
+      SQS_QUEUE_URL: 'https://sqs.us-east-1.amazonaws.com/123456789012/docuia',
+      EVENTS_DRIVER: 'none',
+    };
+
+    it('accepts the AWS drivers without MongoDB', () => {
+      const env = validateEnv(AWS_ENV);
+
+      expect(env.MONGODB_URI).toBeUndefined();
+      expect(env.DATABASE_DRIVER).toBe('dynamodb');
+    });
+
+    it.each([
+      'DYNAMODB_DOCUMENTS_TABLE',
+      'DYNAMODB_CONVERSATIONS_TABLE',
+      'DYNAMODB_MESSAGES_TABLE',
+      'S3_BUCKET',
+      'SQS_QUEUE_URL',
+    ])('requires %s for its driver', (key) => {
+      const env: Record<string, string> = { ...AWS_ENV };
+      delete env[key];
+
+      expect(() => validateEnv(env)).toThrow(key);
+      expect(() => validateEnv(env)).toThrow(/Required when/);
+    });
+
+    it('rejects a queue URL that is not a URL', () => {
+      expect(() =>
+        validateEnv({ ...AWS_ENV, SQS_QUEUE_URL: 'docuia-queue' }),
+      ).toThrow(/SQS_QUEUE_URL/);
+    });
   });
 
   it('rejects an upload limit above the maximum', () => {

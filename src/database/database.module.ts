@@ -1,16 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { MongooseModule } from '@nestjs/mongoose';
-import { Env } from '../config/env.schema.js';
+import { importForDriver } from '../common/modules/import-for-driver.js';
+import { MongoDatabaseModule } from './mongo-database.module.js';
 
+/**
+ * Conexión de base de datos del driver elegido. DynamoDB no necesita una
+ * conexión previa: cada repositorio usa su cliente del SDK.
+ */
 @Module({
   imports: [
-    MongooseModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>) => ({
-        uri: config.get('MONGODB_URI', { infer: true }),
-      }),
-    }),
+    ...importForDriver('DATABASE_DRIVER', { mongodb: MongoDatabaseModule }),
   ],
 })
 export class DatabaseModule {}

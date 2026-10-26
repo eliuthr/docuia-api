@@ -11,6 +11,7 @@ import {
   toDocumentPage,
 } from '../../src/documents/domain/document-page.js';
 import { DocumentSearchCriteria } from '../../src/documents/domain/document-search-criteria.js';
+import { matchesSearchCriteria } from '../../src/documents/domain/matches-search-criteria.js';
 import { DocumentRepository } from '../../src/documents/repositories/document.repository.js';
 
 export class InMemoryDocumentRepository extends DocumentRepository {
@@ -39,7 +40,7 @@ export class InMemoryDocumentRepository extends DocumentRepository {
   search(criteria: DocumentSearchCriteria): Promise<DocumentEntity[]> {
     const matches = [...this.documents.values()]
       .reverse()
-      .filter((document) => matchesCriteria(document, criteria));
+      .filter((document) => matchesSearchCriteria(document, criteria));
     return Promise.resolve(matches.slice(0, criteria.limit));
   }
 
@@ -77,31 +78,6 @@ function isAfter(
   cursor: DocumentPageCursor | null,
 ): boolean {
   return cursor === null || newestFirst(cursor, document) < 0;
-}
-
-/** Versión simplificada del filtro de Mongo: busca el texto en todo el documento. */
-function matchesCriteria(
-  document: DocumentEntity,
-  criteria: DocumentSearchCriteria,
-): boolean {
-  if (document.status !== criteria.status) {
-    return false;
-  }
-  if (
-    criteria.documentType &&
-    document.documentType !== criteria.documentType
-  ) {
-    return false;
-  }
-  if (!criteria.text) {
-    return true;
-  }
-  const searchable = JSON.stringify([
-    document.originalName,
-    document.summary,
-    document.extractedData,
-  ]).toLowerCase();
-  return searchable.includes(criteria.text.toLowerCase());
 }
 
 @Module({

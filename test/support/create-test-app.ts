@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { LlmProvider } from '../../src/ai/llm/llm.provider.js';
 import { AppModule } from '../../src/app.module.js';
@@ -17,8 +17,13 @@ import { InMemoryDocumentEventsModule } from './in-memory-document-events.js';
 import { InMemoryQueueModule } from './in-memory-queue.provider.js';
 import { ScriptedLlmProvider } from './scripted-llm.provider.js';
 
-/** Arranca la app completa sin MongoDB, Redis (cola y eventos) ni LLM real, con dobles en memoria. */
-export async function createTestApp(): Promise<INestApplication> {
+/**
+ * Arranca la app completa sin MongoDB, Redis (cola y eventos) ni LLM real, con
+ * dobles en memoria. `eventsModule` permite probar otro driver de eventos.
+ */
+export async function createTestApp(
+  eventsModule: Type = InMemoryDocumentEventsModule,
+): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideModule(DatabaseModule)
     .useModule(NoDatabaseModule)
@@ -29,7 +34,7 @@ export async function createTestApp(): Promise<INestApplication> {
     .overrideModule(QueueModule)
     .useModule(InMemoryQueueModule)
     .overrideModule(DocumentEventsSubscriberModule)
-    .useModule(InMemoryDocumentEventsModule)
+    .useModule(eventsModule)
     .overrideProvider(LlmProvider)
     .useValue(new ScriptedLlmProvider())
     .compile();

@@ -1,29 +1,15 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import {
-  ConversationMessageRecord,
-  ConversationMessageRecordSchema,
-} from '../schemas/conversation-message-record.schema.js';
-import {
-  ConversationRecord,
-  ConversationRecordSchema,
-} from '../schemas/conversation-record.schema.js';
-import { ConversationRepository } from './conversation.repository.js';
-import { MongoConversationRepository } from './mongo-conversation.repository.js';
+import { importForDriver } from '../../common/modules/import-for-driver.js';
+import { DynamoDbConversationPersistenceModule } from './dynamodb-conversation-persistence.module.js';
+import { MongoConversationPersistenceModule } from './mongo-conversation-persistence.module.js';
 
+/** Da acceso a `ConversationRepository` con la implementación de DATABASE_DRIVER. */
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: ConversationRecord.name, schema: ConversationRecordSchema },
-      {
-        name: ConversationMessageRecord.name,
-        schema: ConversationMessageRecordSchema,
-      },
-    ]),
+    ...importForDriver('DATABASE_DRIVER', {
+      mongodb: MongoConversationPersistenceModule,
+      dynamodb: DynamoDbConversationPersistenceModule,
+    }),
   ],
-  providers: [
-    { provide: ConversationRepository, useClass: MongoConversationRepository },
-  ],
-  exports: [ConversationRepository],
 })
 export class ConversationPersistenceModule {}
