@@ -65,9 +65,16 @@ aws sts get-caller-identity   # must show the docuia-admin user
 `cdk bootstrap` creates a small `CDKToolkit` stack (an S3 bucket and IAM roles) that CDK uses to
 upload the Lambda package.
 
+Every `cdk` command, `bootstrap` included, loads the CDK app, and the app needs the OpenAI key
+and the Lambda package. The key is read from your shell, never from the repository; this line
+reads it from the API's local `.env` without typing it (so it is not saved in the PowerShell
+history). It only exists in that window: set it again if you close it.
+
 ```powershell
 cd infra
 npm ci
+$env:OPENAI_API_KEY = ((Get-Content ..\.env | Select-String '^OPENAI_API_KEY=').Line -split '=', 2)[1]
+npm run package:lambda
 npx cdk bootstrap aws://<ACCOUNT_ID>/us-east-1
 ```
 
@@ -75,12 +82,9 @@ npx cdk bootstrap aws://<ACCOUNT_ID>/us-east-1
 
 ## 7. Deploy
 
-The OpenAI key is read from your shell, never from the repository. This reads it from the
-API's local `.env` without typing it (so it is not saved in the PowerShell history):
+In the same shell as step 6 (with `OPENAI_API_KEY` set):
 
 ```powershell
-cd infra
-$env:OPENAI_API_KEY = ((Get-Content ..\.env | Select-String '^OPENAI_API_KEY=').Line -split '=', 2)[1]
 # Optional: the web client's origin, if it is not http://localhost:4200
 # $env:DOCUIA_CORS_ORIGIN = 'https://your-web-client'
 npm run deploy
