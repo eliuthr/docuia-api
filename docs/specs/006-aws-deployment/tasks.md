@@ -24,7 +24,7 @@ Infrastructure:
 
 Deployment (with the owner):
 
-- [ ] **T13** Account and budget alert (owner), `cdk bootstrap` and first deploy.
+- [x] **T13** Account and budget alert (owner), `cdk bootstrap` and first deploy.
 - [ ] **T14** Manual run on AWS: upload the sample documents, ask questions, check CloudWatch and
       billing.
 
@@ -41,6 +41,20 @@ Deployment (with the owner):
     started (`GET /health` → 200, JSON logs) and `GET /documents/events` → 503; the worker
     handler module imports and exports `handler`.
   - Unzipped size 104 MB after pruning (243 MB before).
+- 2026-10-26 — First deploy to a new free-plan account (`us-east-1`), as `docuia-admin` with
+  `aws login`: `cdk bootstrap` and `cdk deploy` created the 21 resources in 93 s.
+  - `GET /health` → 200 (5.9 s on the cold start, 0.4–0.6 s after), `GET /documents` → empty
+    page from DynamoDB, `GET /documents/events` → 503.
+  - The first upload stayed `pending`: the worker failed with `Cannot find module 'sqs-worker'`.
+    Lambda reads the handler as `file.function` and splits at the first dot of the file name,
+    so `dist/lambda/sqs-worker.handler.handler` could not load. Fixed with
+    `src/lambda/index.ts` as the entry point and a CDK test for the handler format (the local
+    smoke test imported the module directly, so it did not catch it).
+  - After redeploying, SQS delivered the same message again when its visibility timeout ended
+    and the document became `ready` with the right type, summary and total
+    (TECNOSUMINISTROS DEL CARIBE S.A.S., 2.638.825 COP) without uploading it again.
+  - `POST /documents/:id/ask` streamed through the function URL: `conversation` at 1.1 s,
+    `status` and `tool` events in between, the verified answer at 6.7 s and `done` at 6.8 s.
 - Implementation notes:
   - `ConditionalModule` decides when the module file is imported, so the AWS wiring test sets
     the variables before importing the root modules (Lambda sets them before the process
