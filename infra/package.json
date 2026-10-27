@@ -1,16 +1,17 @@
 {
   "name": "docuia-infra",
   "version": "0.0.1",
-  "description": "AWS CDK stack for DocuIA (API and worker on Lambda, S3, SQS, DynamoDB)",
+  "description": "AWS CDK stack for DocuIA (web client on CloudFront, API and worker on Lambda, S3, SQS, DynamoDB)",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
     "package:lambda": "node scripts/package-lambda.mjs",
+    "package:web": "node scripts/build-web.mjs",
     "synth": "npm run build && cdk synth",
     "diff": "npm run build && cdk diff",
-    "deploy": "npm run package:lambda && npm run build && cdk deploy",
+    "deploy": "npm run package:lambda && npm run package:web && npm run build && cdk deploy",
     "destroy": "npm run build && cdk destroy"
   },
   "dependencies": {

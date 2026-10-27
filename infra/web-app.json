@@ -1,0 +1,4 @@
+{
+  "webDir": "../../docuia-web",
+  "buildDir": "dist/docuia-web/browser"
+}

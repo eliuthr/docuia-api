@@ -150,7 +150,9 @@ from an SQS-triggered Lambda on AWS.
 ## AWS deployment
 
 ```
-browser ──HTTPS──► API Lambda (NestJS + Lambda Web Adapter, function URL with streaming)
+browser ──HTTPS──► CloudFront ──► S3 (Angular web client, private bucket)
+   │
+   └─────HTTPS──► API Lambda (NestJS + Lambda Web Adapter, function URL with streaming)
                       │ S3 (files) · DynamoDB (documents, conversations, messages)
                       └─► SQS ──► worker Lambda ──► OpenAI          failed jobs ─► DLQ
 ```
@@ -161,6 +163,9 @@ browser ──HTTPS──► API Lambda (NestJS + Lambda Web Adapter, function U
 - **Free tier by design**: arm64 Lambdas without a VPC (no NAT Gateway), DynamoDB provisioned
   at exactly the 25 free read/write units, 7-day log retention, a 104 MB Lambda package
   (types, source maps and docs pruned).
+- **One stack, one command**: `npm run deploy` publishes the web client, the API and the worker.
+  The deploy writes the API URL into the client's `config.json` and sets CORS to the CloudFront
+  domain, so nothing is configured by hand.
 - **Infrastructure as code** with the AWS CDK in [`infra/`](infra), with assertion tests.
 
 Step-by-step guide (account, budget alerts, `aws login`, deploy, destroy):

@@ -21,6 +21,8 @@ Infrastructure:
       NFR-3, NFR-4)
 - [x] **T12** `docs/aws-setup.md`: account, MFA, budget alert, CLI credentials, bootstrap,
       deploy, destroy. README section.
+- [x] **T15** Web client on S3 + CloudFront in the same stack: OAC, SPA fallback, runtime
+      `config.json` with the API URL, CORS from the CloudFront domain, CDK tests and guide.
 
 Deployment (with the owner):
 

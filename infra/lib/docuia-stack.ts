@@ -17,9 +17,11 @@ import {
 } from 'aws-cdk-lib/aws-lambda';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
+import { ISource } from 'aws-cdk-lib/aws-s3-deployment';
 import { Construct } from 'constructs';
 import { DataStores } from './data-stores';
 import { PROCESSING_MAX_ATTEMPTS, ProcessingQueue } from './processing-queue';
+import { WebHosting } from './web-hosting';
 
 const MEMORY_MB = 1024;
 const FUNCTION_TIMEOUT = Duration.seconds(120);
@@ -42,13 +44,14 @@ export interface DocuiaStackProps extends StackProps {
   lambdaCode: Code;
   /** Se guarda como variable de entorno de las Lambdas; nunca en el repositorio. */
   openAiApiKey: string;
-  /** Origen del cliente web permitido por CORS. */
-  corsOrigin: string;
+  /** El build de Angular de docuia-web (ver scripts/build-web.mjs). */
+  webAssets: ISource;
 }
 
 /**
- * DocuIA en AWS: la API y el worker en Lambda (arm64, sin VPC), archivos en
- * S3, trabajos en SQS y datos en DynamoDB. Todo dentro de la capa gratuita.
+ * DocuIA en AWS: el cliente web en S3 + CloudFront, la API y el worker en
+ * Lambda (arm64, sin VPC), archivos en S3, trabajos en SQS y datos en
+ * DynamoDB. Todo dentro de la capa gratuita.
  */
 export class DocuiaStack extends Stack {
   constructor(scope: Construct, id: string, props: DocuiaStackProps) {
@@ -57,7 +60,12 @@ export class DocuiaStack extends Stack {
     const processing = new ProcessingQueue(this, 'Processing', {
       workerTimeout: FUNCTION_TIMEOUT,
     });
-    const environment = this.appEnvironment(data, processing, props);
+    const web = new WebHosting(this, 'Web');
+    // La API solo acepta peticiones del navegador que vengan del cliente web.
+    const environment = this.appEnvironment(data, processing, {
+      corsOrigin: web.origin,
+      openAiApiKey: props.openAiApiKey,
+    });
 
     const api = this.createApi(props.lambdaCode, environment);
     // Incluye borrar: la API elimina el archivo si no puede encolar el documento.
@@ -81,6 +89,8 @@ export class DocuiaStack extends Stack {
       authType: FunctionUrlAuthType.NONE,
       invokeMode: InvokeMode.RESPONSE_STREAM,
     });
+    web.deployContent(props.webAssets, { apiBaseUrl: url.url });
+    new CfnOutput(this, 'WebUrl', { value: web.origin });
     new CfnOutput(this, 'ApiUrl', { value: url.url });
     new CfnOutput(this, 'DeadLetterQueueUrl', {
       value: processing.deadLetterQueue.queueUrl,
@@ -96,12 +106,12 @@ export class DocuiaStack extends Stack {
   private appEnvironment(
     data: DataStores,
     processing: ProcessingQueue,
-    props: DocuiaStackProps,
+    settings: { corsOrigin: string; openAiApiKey: string },
   ): Record<string, string> {
     return {
       NODE_ENV: 'production',
       LOG_FORMAT: 'json',
-      CORS_ORIGIN: props.corsOrigin,
+      CORS_ORIGIN: settings.corsOrigin,
       DATABASE_DRIVER: 'dynamodb',
       DYNAMODB_DOCUMENTS_TABLE: data.documentsTable.tableName,
       DYNAMODB_CONVERSATIONS_TABLE: data.conversationsTable.tableName,
@@ -113,7 +123,7 @@ export class DocuiaStack extends Stack {
       SQS_QUEUE_URL: processing.queue.queueUrl,
       PROCESSING_MAX_ATTEMPTS: String(PROCESSING_MAX_ATTEMPTS),
       EVENTS_DRIVER: 'none',
-      OPENAI_API_KEY: props.openAiApiKey,
+      OPENAI_API_KEY: settings.openAiApiKey,
     };
   }
 

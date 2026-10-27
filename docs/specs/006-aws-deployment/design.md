@@ -196,6 +196,30 @@ The ZIP path is shared through `infra/lambda-package.json`. esbuild bundling is 
 NestJS needs `emitDecoratorMetadata`, which esbuild does not support. `@nestjs/swagger` declares
 `typescript` as a production dependency, which accounts for 23 MB of the package.
 
+## Web client hosting
+
+`WebHosting` (`infra/lib/web-hosting.ts`) serves the Angular build of `docuia-web` from the same
+stack:
+
+- A private S3 bucket (all public access blocked). Only the CloudFront distribution can read it,
+  through an **Origin Access Control (OAC)**: CloudFront signs its requests to S3 and the bucket
+  policy accepts only that distribution.
+- CloudFront redirects HTTP to HTTPS, uses price class 100 and answers `403` and `404` with
+  `/index.html` (status `200`), so a reload of a deep link such as `/documents/123` reaches the
+  Angular router. S3 returns `403`, not `404`, for a missing key when the reader cannot list the
+  bucket.
+- A `BucketDeployment` uploads the build plus `config.json` (`{ "apiBaseUrl": <function URL> }`),
+  written at deploy time because the function URL does not exist before the first deploy. It
+  invalidates `/*` (one invalidation path per deploy; 1000 per month are free).
+- The API's `CORS_ORIGIN` is `https://<distribution domain>`, so the stack wires both ends
+  without manual configuration.
+- The web client reads `config.json` before bootstrapping when its environment has no fixed
+  `apiBaseUrl` (production build); the development build keeps `http://localhost:3000`.
+- The bucket only holds build output, so it is destroyed with the stack (`autoDeleteObjects`).
+
+`scripts/build-web.mjs` runs `npm run build` in the sibling `docuia-web` repository (path in
+`infra/web-app.json`); `npm run deploy` runs it before `cdk deploy`.
+
 ## Secrets
 
 `cdk deploy` reads `OPENAI_API_KEY` from the shell and sets it as a Lambda environment variable,
@@ -238,4 +262,8 @@ the stack has no output that contains it (AC-6.5). Moving it to SSM Parameter St
 - **Three tables instead of single-table design**: each repository maps to its own table, which
   is easier to read and to explain; single-table design is a later optimization.
 - **No live events on AWS**: the web client already falls back to polling.
+- **CloudFront + S3 instead of Netlify or Amplify Hosting**: one stack and one command for the
+  whole application, and CloudFront's always-free tier (1 TB and 10 million requests per month).
+- **Runtime `config.json` instead of a build-time URL**: the web client is built once and does
+  not need a second deploy after the function URL is known.
 - **CDK in its own package**: CDK libraries never end up in the Lambda bundle.

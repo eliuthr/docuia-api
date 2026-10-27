@@ -1,6 +1,7 @@
 import { App } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { Code } from 'aws-cdk-lib/aws-lambda';
+import { Source } from 'aws-cdk-lib/aws-s3-deployment';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CAPACITY_UNITS } from './data-stores';
 import { DocuiaStack, WORKER_HANDLER } from './docuia-stack';
@@ -15,7 +16,7 @@ function synthesize(): Template {
     env: { account: '123456789012', region: 'us-east-1' },
     lambdaCode: Code.fromInline('exports.handler = async () => {};'),
     openAiApiKey: OPENAI_API_KEY,
-    corsOrigin: 'http://localhost:4200',
+    webAssets: Source.data('index.html', '<app-root></app-root>'),
   });
   return Template.fromStack(stack);
 }
@@ -169,10 +170,58 @@ describe('DocuiaStack', () => {
     );
   });
 
+  it('serves the web client from a private bucket through CloudFront over HTTPS', () => {
+    template.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        DefaultRootObject: 'index.html',
+        PriceClass: 'PriceClass_100',
+        DefaultCacheBehavior: Match.objectLike({
+          ViewerProtocolPolicy: 'redirect-to-https',
+        }),
+      }),
+    });
+    template.resourceCountIs('AWS::CloudFront::OriginAccessControl', 1);
+  });
+
+  it('answers unknown paths with index.html so Angular routes survive a reload', () => {
+    const fallback = (status: number) => ({
+      ErrorCode: status,
+      ResponseCode: 200,
+      ResponsePagePath: '/index.html',
+    });
+    template.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        CustomErrorResponses: [fallback(403), fallback(404)],
+      }),
+    });
+  });
+
+  it('uploads the web client and invalidates the CloudFront cache', () => {
+    template.hasResourceProperties('Custom::CDKBucketDeployment', {
+      DistributionPaths: ['/*'],
+    });
+  });
+
+  it('allows CORS only from the CloudFront domain', () => {
+    const [api] = Object.values(
+      template.findResources('AWS::Lambda::Function', {
+        Properties: { Handler: 'run.sh' },
+      }),
+    ) as Resource[];
+    const environment = api.Properties.Environment as {
+      Variables: Record<string, unknown>;
+    };
+    const corsOrigin = JSON.stringify(environment.Variables.CORS_ORIGIN);
+
+    expect(corsOrigin).toContain('https://');
+    expect(corsOrigin).toContain('DomainName');
+  });
+
   it('never puts the OpenAI key in the stack outputs', () => {
     const outputs = JSON.stringify(template.toJSON().Outputs);
 
     expect(outputs).toContain('ApiUrl');
+    expect(outputs).toContain('WebUrl');
     expect(outputs).not.toContain(OPENAI_API_KEY);
   });
 });

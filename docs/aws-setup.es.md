@@ -2,12 +2,14 @@
 
 > Versión en español de [`aws-setup.md`](aws-setup.md). Si cambias una, actualiza la otra.
 
-Esta guía lleva una cuenta nueva de AWS hasta tener la API de DocuIA funcionando en Lambda. Todo
+Esta guía lleva una cuenta nueva de AWS hasta tener DocuIA (cliente web y API) funcionando en AWS. Todo
 lo que crea cabe en la capa gratuita de AWS; el único costo real es la API de OpenAI. Léela
 completa una vez antes de empezar.
 
 Qué se crea (ver `docs/specs/006-aws-deployment/design.md`):
 
+- El cliente web: un bucket privado de S3 con el build de Angular y una distribución de
+  CloudFront (HTTPS) delante.
 - Dos funciones Lambda (API y worker), arm64, sin VPC.
 - Una Function URL para la API (HTTPS, con respuestas en streaming).
 - Un bucket de S3, una cola SQS con su cola de mensajes fallidos (DLQ) y tres tablas de DynamoDB.
@@ -54,6 +56,9 @@ DocuIA.
 - **Docker Desktop** abierto (el paquete de las Lambdas se comprime dentro de un contenedor
   Linux).
 - Node.js 24 (ya lo usa el proyecto).
+- El cliente web clonado junto a este repositorio (`docuia/docuia-web`, al lado de
+  `docuia/docuia-api`) con sus dependencias instaladas (`npm ci` dentro de `docuia-web`). La ruta
+  está en `infra/web-app.json`.
 
 Inicia sesión desde la CLI con tu usuario de la consola; no se crean ni se guardan access keys:
 
@@ -68,7 +73,7 @@ aws sts get-caller-identity   # debe mostrar el usuario docuia-admin
 CDK usa para subir el paquete de las Lambdas.
 
 Todos los comandos de `cdk`, incluido `bootstrap`, leen la app de CDK, y la app necesita la key
-de OpenAI y el paquete de las Lambdas. La key se lee de tu terminal, nunca del repositorio; esta
+de OpenAI, el paquete de las Lambdas y el build del cliente web. La key se lee de tu terminal, nunca del repositorio; esta
 línea la toma del `.env` local de la API sin que la escribas (así no queda en el historial de
 PowerShell). Solo existe en esa ventana: si la cierras, defínela otra vez.
 
@@ -77,6 +82,7 @@ cd infra
 npm ci
 $env:OPENAI_API_KEY = ((Get-Content ..\.env | Select-String '^OPENAI_API_KEY=').Line -split '=', 2)[1]
 npm run package:lambda
+npm run package:web
 npx cdk bootstrap aws://<ACCOUNT_ID>/us-east-1
 ```
 
@@ -87,15 +93,14 @@ npx cdk bootstrap aws://<ACCOUNT_ID>/us-east-1
 En la misma terminal del paso 6 (con `OPENAI_API_KEY` definida):
 
 ```powershell
-# Opcional: el origen del cliente web, si no es http://localhost:4200
-# $env:DOCUIA_CORS_ORIGIN = 'https://tu-cliente-web'
 npm run deploy
 ```
 
-`npm run deploy` compila la API, la empaqueta (`scripts/package-lambda.mjs`), compila el stack y
-ejecuta `cdk deploy`. CDK muestra los cambios de permisos (IAM) y pide confirmación. Al final
+`npm run deploy` compila la API, la empaqueta (`scripts/package-lambda.mjs`), compila el cliente
+web (`scripts/build-web.mjs`), compila el stack y ejecuta `cdk deploy`. CDK muestra los cambios de permisos (IAM) y pide confirmación. Al final
 imprime estas salidas:
 
+- `WebUrl`: el cliente web (`https://xxxx.cloudfront.net`).
 - `ApiUrl`: la URL pública de la API.
 - `ApiLogGroup` y `WorkerLogGroup`: los grupos de logs en CloudWatch.
 - `DeadLetterQueueUrl`: los mensajes que fallaron en todos sus intentos.
@@ -110,9 +115,19 @@ curl.exe "$api/documents?limit=5"
 aws logs tail <WorkerLogGroup> --follow
 ```
 
-Para usar el cliente web contra AWS, pon la `ApiUrl` en `apiBaseUrl` dentro de
-`docuia-web/src/environments`. Los eventos en vivo están apagados en AWS
-(`GET /documents/events` responde `503`), así que el cliente web consulta el estado con polling.
+Abre la `WebUrl` en el navegador. El primer despliegue de una distribución de CloudFront tarda
+5–10 minutos en llegar a todas las ubicaciones; mientras tanto la página puede no cargar. No hay
+que configurar nada a mano:
+
+- El despliegue escribe `config.json` (con la `ApiUrl`) junto al build, y el cliente web lo lee al
+  arrancar.
+- La API solo acepta CORS desde la `WebUrl`. Para llamar a la API de AWS desde `localhost:4200`
+  habría que cambiar `CORS_ORIGIN` en el stack.
+- Recargar una ruta como `/documents/123` funciona: CloudFront responde a las rutas desconocidas
+  con `index.html` y el router de Angular las resuelve.
+
+Los eventos en vivo están apagados en AWS (`GET /documents/events` responde `503`), así que el
+cliente web consulta el estado con polling.
 
 Para revisar el costo: Billing and Cost Management → **Free tier** muestra el uso de cada
 servicio.
@@ -145,3 +160,6 @@ servicio.
 | `The Lambda package is ... MB`                  | Creció una dependencia; revisa `npm ls --omit=dev` por paquetes que deberían ser de desarrollo. |
 | `ExpiredToken` o `Unable to locate credentials` | Ejecuta `aws login` otra vez (la sesión dura hasta 12 horas).                                   |
 | La subida responde `413`                        | En AWS los archivos tienen un límite de 5 MB (límite de petición de la Function URL).           |
+| `Web client build not found`                    | Ejecuta `npm run package:web` (necesita `docuia-web` con `npm ci` hecho, ver paso 5).           |
+| CloudFront: `account must be verified`          | Las cuentas nuevas pueden necesitar verificación; abre un caso con AWS Support (gratis).        |
+| La página queda en blanco tras desplegar        | Espera a que termine el despliegue de CloudFront (5–10 min la primera vez) y recarga.           |

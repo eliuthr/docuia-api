@@ -2,11 +2,13 @@
 
 > Spanish version: [`aws-setup.es.md`](aws-setup.es.md). Keep both in sync.
 
-This guide takes a new AWS account to a working DocuIA API on Lambda. Everything it creates fits
+This guide takes a new AWS account to a working DocuIA (web client and API) on AWS. Everything it creates fits
 in the AWS free tier; the only real cost is the OpenAI API. Read it once before starting.
 
 What gets created (see `docs/specs/006-aws-deployment/design.md`):
 
+- The web client: a private S3 bucket with the Angular build and a CloudFront distribution
+  (HTTPS) in front of it.
 - Two Lambda functions (API and worker), arm64, no VPC.
 - A function URL for the API (HTTPS, response streaming).
 - An S3 bucket, an SQS queue with a dead-letter queue, and three DynamoDB tables.
@@ -52,6 +54,9 @@ DocuIA uses.
   Check with `aws --version`.
 - **Docker Desktop** running (the Lambda package is zipped inside a Linux container).
 - Node.js 24 (already used by the project).
+- The web client cloned next to this repository (`docuia/docuia-web`, beside `docuia/docuia-api`)
+  with its dependencies installed (`npm ci` inside `docuia-web`). The path is in
+  `infra/web-app.json`.
 
 Sign in from the CLI with your console user; no access keys are created or stored:
 
@@ -65,8 +70,8 @@ aws sts get-caller-identity   # must show the docuia-admin user
 `cdk bootstrap` creates a small `CDKToolkit` stack (an S3 bucket and IAM roles) that CDK uses to
 upload the Lambda package.
 
-Every `cdk` command, `bootstrap` included, loads the CDK app, and the app needs the OpenAI key
-and the Lambda package. The key is read from your shell, never from the repository; this line
+Every `cdk` command, `bootstrap` included, loads the CDK app, and the app needs the OpenAI key,
+the Lambda package and the web client build. The key is read from your shell, never from the repository; this line
 reads it from the API's local `.env` without typing it (so it is not saved in the PowerShell
 history). It only exists in that window: set it again if you close it.
 
@@ -75,6 +80,7 @@ cd infra
 npm ci
 $env:OPENAI_API_KEY = ((Get-Content ..\.env | Select-String '^OPENAI_API_KEY=').Line -split '=', 2)[1]
 npm run package:lambda
+npm run package:web
 npx cdk bootstrap aws://<ACCOUNT_ID>/us-east-1
 ```
 
@@ -85,15 +91,14 @@ npx cdk bootstrap aws://<ACCOUNT_ID>/us-east-1
 In the same shell as step 6 (with `OPENAI_API_KEY` set):
 
 ```powershell
-# Optional: the web client's origin, if it is not http://localhost:4200
-# $env:DOCUIA_CORS_ORIGIN = 'https://your-web-client'
 npm run deploy
 ```
 
-`npm run deploy` builds the API, packages it (`scripts/package-lambda.mjs`), compiles the stack
-and runs `cdk deploy`. CDK shows the IAM changes and asks for confirmation. At the end it prints
+`npm run deploy` builds the API, packages it (`scripts/package-lambda.mjs`), builds the web client
+(`scripts/build-web.mjs`), compiles the stack and runs `cdk deploy`. CDK shows the IAM changes and asks for confirmation. At the end it prints
 the outputs:
 
+- `WebUrl`: the web client (`https://xxxx.cloudfront.net`).
 - `ApiUrl`: the public URL of the API.
 - `ApiLogGroup` and `WorkerLogGroup`: CloudWatch log groups.
 - `DeadLetterQueueUrl`: messages that failed every attempt.
@@ -108,9 +113,19 @@ curl.exe "$api/documents?limit=5"
 aws logs tail <WorkerLogGroup> --follow
 ```
 
-To use the web client against AWS, set `apiBaseUrl` in `docuia-web/src/environments` to the
-`ApiUrl`. Live status events are off on AWS (`GET /documents/events` responds `503`), so the
-web client polls instead.
+Open the `WebUrl` in the browser. The first deploy of a CloudFront distribution takes 5–10 minutes
+to reach every edge location; until then the page may not load. Nothing has to be configured by
+hand:
+
+- The deploy writes `config.json` (with the `ApiUrl`) next to the build, and the web client reads it
+  when it starts.
+- The API allows CORS only from the `WebUrl`. To call the AWS API from `localhost:4200` you would
+  have to change `CORS_ORIGIN` in the stack.
+- Reloading a route such as `/documents/123` works: CloudFront answers unknown paths with
+  `index.html` and the Angular router resolves them.
+
+Live status events are off on AWS (`GET /documents/events` responds `503`), so the web client
+polls instead.
 
 Check the cost: Billing and Cost Management → **Free tier** shows the usage of each service.
 
@@ -142,3 +157,6 @@ Check the cost: Billing and Cost Management → **Free tier** shows the usage of
 | `The Lambda package is ... MB`                   | A dependency grew; check `npm ls --omit=dev` for packages that should be dev-only. |
 | `ExpiredToken` or `Unable to locate credentials` | Run `aws login` again (sessions last up to 12 hours).                              |
 | Upload responds `413`                            | Files are limited to 5 MB on AWS (function URL request limit).                     |
+| `Web client build not found`                     | Run `npm run package:web` (needs `docuia-web` with `npm ci` done, see step 5).     |
+| CloudFront: `account must be verified`           | New accounts may need verification; open a case with AWS Support (free).           |
+| The web page is blank after a deploy             | Wait for the CloudFront deploy (5–10 min the first time); then reload the page.    |
