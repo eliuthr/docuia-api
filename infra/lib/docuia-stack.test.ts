@@ -3,7 +3,7 @@ import { Match, Template } from 'aws-cdk-lib/assertions';
 import { Code } from 'aws-cdk-lib/aws-lambda';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CAPACITY_UNITS } from './data-stores';
-import { DocuiaStack } from './docuia-stack';
+import { DocuiaStack, WORKER_HANDLER } from './docuia-stack';
 
 const OPENAI_API_KEY = 'sk-test-never-in-outputs';
 
@@ -106,12 +106,18 @@ describe('DocuiaStack', () => {
 
   it('feeds the worker one SQS message at a time with partial batch failures', () => {
     template.hasResourceProperties('AWS::Lambda::Function', {
-      Handler: 'dist/lambda/sqs-worker.handler.handler',
+      Handler: 'dist/lambda/index.handler',
     });
     template.hasResourceProperties('AWS::Lambda::EventSourceMapping', {
       BatchSize: 1,
       FunctionResponseTypes: ['ReportBatchItemFailures'],
     });
+  });
+
+  it('names the worker handler as file.function, with no dots in the file name', () => {
+    // Lambda corta en el primer punto del nombre del archivo: `a.b.handler` buscaría el archivo `a`.
+    const fileName = WORKER_HANDLER.split('/').at(-1) ?? '';
+    expect(fileName.split('.')).toHaveLength(2);
   });
 
   it('retries jobs through the visibility timeout and keeps failed ones in a DLQ', () => {

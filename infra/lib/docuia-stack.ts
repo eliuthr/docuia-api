@@ -27,6 +27,11 @@ const FUNCTION_TIMEOUT = Duration.seconds(120);
 const MAX_UPLOAD_SIZE_MB = 5;
 /** Puerto donde escucha NestJS dentro de la Lambda; el Lambda Web Adapter le reenvía las peticiones. */
 const API_PORT = 8080;
+/**
+ * Lambda lee el handler como `archivo.función` y corta en el primer punto del
+ * nombre del archivo, así que el archivo no puede tener puntos (ver src/lambda/index.ts).
+ */
+export const WORKER_HANDLER = 'dist/lambda/index.handler';
 /** Capa pública de AWS con el Lambda Web Adapter (arm64, versión 30) en la región del stack. */
 function webAdapterLayerArn(region: string): string {
   return `arn:aws:lambda:${region}:753240598075:layer:LambdaAdapterLayerArm64:30`;
@@ -145,12 +150,7 @@ export class DocuiaStack extends Stack {
     code: Code,
     environment: Record<string, string>,
   ): LambdaFunction {
-    return this.createFunction(
-      'Worker',
-      code,
-      'dist/lambda/sqs-worker.handler.handler',
-      environment,
-    );
+    return this.createFunction('Worker', code, WORKER_HANDLER, environment);
   }
 
   private createFunction(
